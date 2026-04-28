@@ -22,6 +22,25 @@ const DEMO   = SB_URL.includes("VOTRE");
 
 /* ══ GOOGLE CALENDAR ══════════════════════════ */
 const GCAL_CLIENT_ID = "692312814786-4mrf2rt3us6kkrhqdai4624puhisrog2.apps.googleusercontent.com";
+
+/* ══ EXPORT CSV ══════════════════════════════ */
+const exportCSV = (rdvList, filename) => {
+  const headers = ["Référence","Date","Heure","Patient","Email","Téléphone","Prestation","Durée","Statut","Notes","Documents","Récurrent"];
+  const rows = rdvList.map(r => [
+    r.id, fmtShort(r.rdv_date), r.slot,
+    r.patient_name, r.patient_email, r.patient_tel,
+    r.service_title, r.service_dur, r.status,
+    (r.notes||"").replace(/,/g,";"),
+    (r.docs||[]).join("|"),
+    r.recurring?"Oui":"Non"
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v=>`"${v||""}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8"});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+};
 const GCAL_SCOPE     = "https://www.googleapis.com/auth/calendar.events";
 const GCAL_API       = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 const SVC_DURATION   = { conseil:45, suivi:30, metabolique:60 };
@@ -328,6 +347,7 @@ function AuthPage({ onAuth, onBack }) {
   const set = (k) => (e) => setForm(f=>({...f,[k]:e.target.value}));
 
   const doLogin = async () => {
+    if (!form.email||!form.pw) { setErr("Email et mot de passe requis"); return; }
     setLoading(true); setErr("");
     try {
       if (DEMO) {
@@ -336,17 +356,26 @@ function AuthPage({ onAuth, onBack }) {
         onAuth({ id:u.id, email:u.email, prenom:u.prenom, nom:u.nom, token:"demo_"+u.id });
       } else {
         const r = await sbAuth.signIn(form.email, form.pw);
-        if (r.error) { setErr(r.error.message); setLoading(false); return; }
-        const m = r.user?.user_metadata||{};
-        onAuth({ id:r.user.id, email:r.user.email, prenom:m.prenom||"", nom:m.nom||"", token:r.access_token });
+        if (r.error) {
+          const msg = r.error.message;
+          if (msg.includes("Invalid login")) setErr("Email ou mot de passe incorrect.");
+          else if (msg.includes("Email not confirmed")) setErr("Veuillez confirmer votre email avant de vous connecter.");
+          else setErr("Erreur : " + msg);
+          setLoading(false); return;
+        }
+        const token = r.session?.access_token || r.access_token;
+        const user  = r.user || r.session?.user;
+        const m = user?.user_metadata||{};
+        onAuth({ id:user.id, email:user.email, prenom:m.prenom||"", nom:m.nom||"", token });
       }
-    } catch(e) { setErr("Erreur de connexion."); }
+    } catch(e) { setErr("Erreur réseau. Vérifiez votre connexion."); }
     setLoading(false);
   };
 
   const doRegister = async () => {
     if (!form.prenom||!form.nom||!form.email||!form.pw) { setErr("Tous les champs marqués * sont requis"); return; }
     if (form.pw.length < 6) { setErr("Mot de passe : 6 caractères minimum"); return; }
+    if (!form.email.match(/^[^@]+@[^@]+\.[^@]+$/)) { setErr("Adresse email invalide"); return; }
     setLoading(true); setErr("");
     try {
       if (DEMO) {
@@ -356,11 +385,25 @@ function AuthPage({ onAuth, onBack }) {
         onAuth({ id:nu.id, email:nu.email, prenom:nu.prenom, nom:nu.nom, token:"demo_"+nu.id });
       } else {
         const r = await sbAuth.signUp(form.email, form.pw, { prenom:form.prenom, nom:form.nom, tel:form.tel });
-        if (r.error) { setErr(r.error.message); setLoading(false); return; }
+        if (r.error) {
+          const msg = r.error.message;
+          if (msg.includes("already registered")) setErr("Cet email est déjà utilisé. Connectez-vous.");
+          else if (msg.includes("password")) setErr("Mot de passe trop simple. Utilisez au moins 6 caractères.");
+          else setErr("Erreur : " + msg);
+          setLoading(false); return;
+        }
+        // Handle email confirmation required
+        if (r.user && !r.session) {
+          setErr(""); setLoading(false);
+          setTab("confirm");
+          return;
+        }
         const m = r.user?.user_metadata||{};
-        onAuth({ id:r.user.id, email:r.user.email, prenom:m.prenom||form.prenom, nom:m.nom||form.nom, token:r.access_token });
+        const token = r.session?.access_token || r.access_token;
+        if (!token) { setErr("Erreur de session. Réessayez."); setLoading(false); return; }
+        onAuth({ id:r.user.id, email:r.user.email, prenom:m.prenom||form.prenom, nom:m.nom||form.nom, token });
       }
-    } catch(e) { setErr("Erreur lors de la création du compte."); }
+    } catch(e) { setErr("Erreur réseau. Vérifiez votre connexion."); }
     setLoading(false);
   };
 
@@ -373,7 +416,19 @@ function AuthPage({ onAuth, onBack }) {
           <p style={{color:"#78909C",fontSize:12}}>{COMPANY.name} – {COMPANY.sub}</p>
         </div>
         <div style={{display:"flex",background:"#F0F4FF",borderRadius:12,padding:4,marginBottom:24}}>
-          {[["login","Se connecter"],["register","Créer un compte"]].map(([v,l])=>(
+          {tab==="confirm" ? (
+          <div style={{textAlign:"center",padding:"10px 0"}}>
+            <div style={{fontSize:48,marginBottom:16}}>📧</div>
+            <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:NAVY,marginBottom:10}}>Vérifiez vos emails !</h3>
+            <p style={{fontSize:13,color:"#546E7A",lineHeight:1.7,marginBottom:20}}>
+              Un lien de confirmation a été envoyé à <strong>{form.email}</strong>.<br/>
+              Cliquez sur le lien dans l'email pour activer votre compte, puis revenez vous connecter.
+            </p>
+            <PrimaryBtn onClick={()=>{setTab("login");setErr("");}} style={{width:"100%"}}>→ Se connecter</PrimaryBtn>
+          </div>
+        ) : (
+        <>
+        {[["login","Se connecter"],["register","Créer un compte"]].map(([v,l])=>(
             <button key={v} onClick={()=>{setTab(v);setErr("");}} style={{flex:1,padding:"9px",border:"none",borderRadius:9,background:tab===v?"#fff":"transparent",color:tab===v?BLUE:"#90A4AE",fontWeight:tab===v?700:500,fontSize:13,boxShadow:tab===v?"0 2px 8px rgba(0,0,0,.08)":"none"}}>{l}</button>
           ))}
         </div>
@@ -396,6 +451,8 @@ function AuthPage({ onAuth, onBack }) {
           {loading ? "Chargement…" : tab==="login" ? "→ Se connecter" : "→ Créer mon compte"}
         </PrimaryBtn>
         <SecBtn onClick={onBack} style={{width:"100%"}}>← Retour</SecBtn>
+        </>
+        )}
       </div>
     </div>
   );
@@ -428,6 +485,31 @@ function PatientDashboard({ user, onBook, onLogout }) {
     if (DEMO) { const r=STORE.appointments.find(a=>a.id===rdv.id); if(r)r.status="cancelled"; }
     else await db.patch("appointments",rdv.id,{status:"cancelled"},user.token);
     setRdvs(rs => rs.map(r => r.id===rdv.id ? {...r,status:"cancelled"} : r));
+    // Email annulation
+    await sendEmail(user.email,"❌ Séance annulée — VITASCIENZELAB",
+      `<div style="font-family:sans-serif;padding:20px;max-width:500px">
+        <h2 style="color:#C62828">Séance annulée</h2>
+        <p>Votre séance du <strong>${fmtLong(rdv.rdv_date)}</strong> à <strong>${rdv.slot}</strong> a bien été annulée.</p>
+        <p style="color:#546E7A">Pour reprendre rendez-vous : <a href="https://vitascienzelab.vercel.app">vitascienzelab.vercel.app</a></p>
+        <p style="font-size:11px;color:#90A4AE;margin-top:20px">VITASCIENZELAB – SIRET : 841 057 730 00019</p>
+      </div>`
+    );
+  };
+
+  const [editingRdv, setEditingRdv] = useState(null);
+  const [editDate, setEditDate]     = useState("");
+  const [editSlot, setEditSlot]     = useState("");
+
+  const saveEdit = async () => {
+    if (!editDate||!editSlot) return;
+    const updates = { rdv_date:editDate, slot:editSlot };
+    if (DEMO) { const r=STORE.appointments.find(a=>a.id===editingRdv.id); if(r){r.rdv_date=editDate;r.slot=editSlot;} }
+    else await db.patch("appointments",editingRdv.id,updates,user.token);
+    setRdvs(rs=>rs.map(r=>r.id===editingRdv.id?{...r,...updates}:r));
+    // Email modification
+    const updated = {...editingRdv,...updates};
+    await sendEmail(user.email,"📅 Séance modifiée — VITASCIENZELAB", buildEmailHTML(updated,"confirm"));
+    setEditingRdv(null); setEditDate(""); setEditSlot("");
   };
 
   const upcoming = rdvs.filter(r => !isExpired(r) && r.status==="confirmed");
@@ -443,6 +525,29 @@ function PatientDashboard({ user, onBook, onLogout }) {
 
   return (
     <div style={{maxWidth:700,margin:"0 auto",padding:"28px 20px 60px"}}>
+      {/* Modal modification RDV */}
+      {editingRdv && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:20,padding:32,maxWidth:420,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,.15)"}}>
+            <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:NAVY,marginBottom:6}}>Modifier votre séance</h3>
+            <p style={{fontSize:12,color:"#78909C",marginBottom:20}}>{editingRdv.service_icon} {editingRdv.service_title}</p>
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:NAVY,marginBottom:6}}>Nouvelle date</label>
+              <input type="date" value={editDate} onChange={e=>setEditDate(e.target.value)} min={new Date().toISOString().split("T")[0]} style={{width:"100%",border:`2px solid ${LIGHT}`,borderRadius:10,padding:"10px 12px",fontSize:13,color:NAVY,outline:"none"}}/>
+            </div>
+            <div style={{marginBottom:20}}>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:NAVY,marginBottom:6}}>Nouveau créneau</label>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                {SLOTS.map(s=><button key={s} onClick={()=>setEditSlot(s)} style={{padding:"10px 6px",borderRadius:9,border:`2px solid ${editSlot===s?BLUE:LIGHT}`,background:editSlot===s?BLUE:"#fff",color:editSlot===s?"#fff":NAVY,fontWeight:600,fontSize:13,cursor:"pointer"}}>{s}</button>)}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <SecBtn onClick={()=>setEditingRdv(null)} style={{flex:1}}>Annuler</SecBtn>
+              <PrimaryBtn onClick={saveEdit} disabled={!editDate||!editSlot} style={{flex:2,opacity:editDate&&editSlot?1:.4}}>✓ Confirmer</PrimaryBtn>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{background:`linear-gradient(135deg,${NAVY},${BLUE})`,borderRadius:20,padding:"22px 26px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div>
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,color:"#fff"}}>Bonjour, {user.prenom} 👋</div>
@@ -484,7 +589,10 @@ function PatientDashboard({ user, onBook, onLogout }) {
               )}
             </div>
             {rdv.status==="confirmed" && !isExpired(rdv) && (
-              <button onClick={()=>cancel(rdv)} style={{background:"#FCE4EC",border:"none",color:"#C62828",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600}}>Annuler</button>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button onClick={()=>{setEditingRdv(rdv);setEditDate(rdv.rdv_date);setEditSlot(rdv.slot);}} style={{background:LIGHT,border:"none",color:BLUE,borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✏️ Modifier</button>
+                <button onClick={()=>cancel(rdv)} style={{background:"#FCE4EC",border:"none",color:"#C62828",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✗ Annuler</button>
+              </div>
             )}
           </div>
           {rdv.status==="confirmed" && !isExpired(rdv) && (
@@ -985,11 +1093,31 @@ function AdminDashboard({ onBack }) {
     setNewNote("");
   };
 
-  const markSent = (rdv) => {
+  const markSent = async (rdv) => {
+    // Envoyer le vrai email 48h
+    await sendEmail(
+      rdv.patient_email,
+      "⏰ Rappel — Votre séance VITASCIENZELAB est dans 48h",
+      buildEmailHTML(rdv, "48h")
+    );
     if (DEMO) { const r=STORE.appointments.find(a=>a.id===rdv.id); if(r)r.reminder_sent=true; }
-    else db.patch("appointments",rdv.id,{reminder_sent:true},SB_KEY);
+    else await db.patch("appointments",rdv.id,{reminder_sent:true},SB_KEY);
     setRdvs(rs=>rs.map(r=>r.id===rdv.id?{...r,reminder_sent:true}:r));
   };
+
+  // Auto-check rappels 48h toutes les heures
+  useEffect(()=>{
+    if(!authed||DEMO) return;
+    const checkReminders = async () => {
+      const toSend = rdvs.filter(need48);
+      for (const rdv of toSend) {
+        await markSent(rdv);
+      }
+    };
+    checkReminders();
+    const interval = setInterval(checkReminders, 3600000); // toutes les heures
+    return () => clearInterval(interval);
+  },[authed, rdvs.length]);
 
   const addBlock = () => {
     if (!newBlock.date) return;
@@ -1146,6 +1274,10 @@ function AdminDashboard({ onBack }) {
       setManualRdv({ prenom:"", nom:"", email:"", tel:"", service_id:"conseil", rdv_date:"", slot:"", notes:"", recurring:false });
       setTimeout(() => setManualOk(false), 4000);
       if (gToken) await syncOneToGCal(rdv);
+      // Envoi email confirmation si email renseigné
+      if (rdv.patient_email && rdv.patient_email !== "—") {
+        await sendEmail(rdv.patient_email, "✅ Votre séance est confirmée — VITASCIENZELAB", buildEmailHTML(rdv,"confirm"));
+      }
     } catch(err) { console.error(err); }
     setManualLoading(false);
   };
@@ -1659,6 +1791,23 @@ Cette action est irréversible.`)) return;
                 </div>
               ))}
             </div>
+            {/* EXPORT CSV */}
+            <div style={{background:"#fff",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(21,101,192,.06)",marginBottom:14}}>
+              <h4 style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:NAVY,marginBottom:14}}>📥 Export des données</h4>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                <button onClick={()=>exportCSV(rdvs.filter(r=>!isExpired(r)&&r.status==="confirmed"),`vita-rdv-avenir-${dateStr(0)}.csv`)} style={{background:`linear-gradient(135deg,${BLUE},${NAVY})`,color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                  📊 Export séances à venir (.csv)
+                </button>
+                <button onClick={()=>exportCSV(rdvs,`vita-historique-${dateStr(0)}.csv`)} style={{background:"#fff",color:BLUE,border:`2px solid ${LIGHT}`,borderRadius:10,padding:"10px 16px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                  📊 Export historique complet (.csv)
+                </button>
+                <button onClick={()=>exportCSV(rdvs.filter(r=>{const d=new Date();const m=r.rdv_date?.slice(0,7);const cm=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;return m===cm;}),`vita-mois-${dateStr(0)}.csv`)} style={{background:"#fff",color:BLUE,border:`2px solid ${LIGHT}`,borderRadius:10,padding:"10px 16px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                  📊 Export ce mois-ci (.csv)
+                </button>
+              </div>
+              <p style={{fontSize:11,color:"#90A4AE",marginTop:10}}>Fichier CSV compatible Excel, Google Sheets, LibreOffice</p>
+            </div>
+
             <div style={{background:"#fff",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(21,101,192,.06)"}}>
               <h4 style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:NAVY,marginBottom:14}}>Activité sur 6 mois</h4>
               <div style={{display:"flex",gap:10,alignItems:"flex-end",height:90}}>
