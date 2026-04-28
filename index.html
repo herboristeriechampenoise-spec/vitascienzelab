@@ -918,8 +918,15 @@ function AdminDashboard({ onBack }) {
       setPatients([...STORE.users]);
       setBlocked([...STORE.blocked]);
     } else {
-      Promise.all([db.get("appointments","order=rdv_date.asc"),db.get("profiles","order=created_at.desc"),db.get("blocked_slots","order=blocked_date.asc")])
-        .then(([r,p,b])=>{ if(Array.isArray(r))setRdvs(r); if(Array.isArray(p))setPatients(p); if(Array.isArray(b))setBlocked(b); });
+      Promise.all([
+        db.get("appointments","order=rdv_date.asc",SB_KEY),
+        db.get("profiles","order=created_at.desc",SB_KEY),
+        db.get("blocked_slots","order=blocked_date.asc",SB_KEY)
+      ]).then(([r,p,b])=>{
+        if(Array.isArray(r))setRdvs(r);
+        if(Array.isArray(p))setPatients(p);
+        if(Array.isArray(b))setBlocked(b);
+      }).catch(e=>console.error("Admin load error:",e));
     }
   },[authed]);
 
@@ -940,14 +947,14 @@ function AdminDashboard({ onBack }) {
     if (!newNote.trim()) return;
     const n = { id:uid(), patient_id:selPat.id, note:newNote, created_at:dateStr(0) };
     if (DEMO) STORE.notes.push(n);
-    else await db.post("admin_notes", n);
+    else await db.post("admin_notes", n, SB_KEY);
     setPatNotes(ns=>[n,...ns]);
     setNewNote("");
   };
 
   const markSent = (rdv) => {
     if (DEMO) { const r=STORE.appointments.find(a=>a.id===rdv.id); if(r)r.reminder_sent=true; }
-    else db.patch("appointments",rdv.id,{reminder_sent:true});
+    else db.patch("appointments",rdv.id,{reminder_sent:true},SB_KEY);
     setRdvs(rs=>rs.map(r=>r.id===rdv.id?{...r,reminder_sent:true}:r));
   };
 
@@ -955,14 +962,14 @@ function AdminDashboard({ onBack }) {
     if (!newBlock.date) return;
     const b = { id:uid(), ...newBlock, created_at:dateStr(0) };
     if (DEMO) STORE.blocked.push(b);
-    else db.post("blocked_slots",b);
+    else db.post("blocked_slots",b,SB_KEY);
     setBlocked(bs=>[...bs,b]);
     setNewBlock({date:"",slot:"",reason:""});
   };
 
   const delBlock = (id) => {
     if (DEMO) STORE.blocked = STORE.blocked.filter(b=>b.id!==id);
-    else db.del("blocked_slots",id);
+    else db.del("blocked_slots",id,SB_KEY);
     setBlocked(bs=>bs.filter(b=>b.id!==id));
   };
 
@@ -1100,7 +1107,7 @@ function AdminDashboard({ onBack }) {
     };
     try {
       if (DEMO) STORE.appointments.push(rdv);
-      else await db.post("appointments", rdv);
+      else await db.post("appointments", rdv, SB_KEY);
       setRdvs(rs => [...rs, rdv]);
       setManualOk(true);
       setManualRdv({ prenom:"", nom:"", email:"", tel:"", service_id:"conseil", rdv_date:"", slot:"", notes:"", recurring:false });
@@ -1116,7 +1123,7 @@ function AdminDashboard({ onBack }) {
 Cette action est irréversible.`)) return;
     try {
       if (DEMO) STORE.appointments = STORE.appointments.filter(a => a.id !== rdv.id);
-      else await db.del("appointments", rdv.id);
+      else await db.del("appointments", rdv.id, SB_KEY);
       setRdvs(rs => rs.filter(r => r.id !== rdv.id));
     } catch(e) { console.error(e); }
   };
