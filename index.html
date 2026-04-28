@@ -1110,6 +1110,17 @@ function AdminDashboard({ onBack }) {
     setManualLoading(false);
   };
 
+  const deleteRdv = async (rdv) => {
+    if (!window.confirm(`Supprimer définitivement le RDV de ${rdv.patient_name} (${fmtShort(rdv.rdv_date)} à ${rdv.slot}) ?
+
+Cette action est irréversible.`)) return;
+    try {
+      if (DEMO) STORE.appointments = STORE.appointments.filter(a => a.id !== rdv.id);
+      else await db.del("appointments", rdv.id);
+      setRdvs(rs => rs.filter(r => r.id !== rdv.id));
+    } catch(e) { console.error(e); }
+  };
+
   const reminder48 = rdvs.filter(need48);
   const filteredRdvs = rdvs
     .filter(r => {
@@ -1482,6 +1493,7 @@ function AdminDashboard({ onBack }) {
                       <button onClick={()=>{setEmailModal(rdv);setEmailType("confirm");}} style={{background:LIGHT,border:"none",color:BLUE,borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600}}>📧 Aperçu</button>
                       {need48(rdv)&&<button onClick={()=>{setEmailModal(rdv);setEmailType("48h");}} style={{background:"#FFF3E0",border:"none",color:"#E65100",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600}}>⏰ Rappel</button>}
                       {need48(rdv)&&<button onClick={()=>markSent(rdv)} style={{background:"#E8F5E9",border:"none",color:"#2E7D32",borderRadius:7,padding:"5px 10px",fontSize:11}}>✓ Envoyé</button>}
+                      <button onClick={()=>deleteRdv(rdv)} style={{background:"#FCE4EC",border:"none",color:"#C62828",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600}}>🗑 Supprimer</button>
                     </div>
                   </div>
                 </div>
@@ -1543,9 +1555,12 @@ function AdminDashboard({ onBack }) {
               <h4 style={{fontFamily:"'Playfair Display',serif",fontSize:16,color:NAVY,marginBottom:14}}>📅 Historique des séances</h4>
               {patRdvs.length===0 ? <p style={{color:"#90A4AE",fontSize:13}}>Aucune séance.</p> :
                 patRdvs.map(r=>(
-                  <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:`1px solid #F0F4FF`,fontSize:12,flexWrap:"wrap",gap:6}}>
+                  <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:`1px solid #F0F4FF`,fontSize:12,flexWrap:"wrap",gap:6}}>
                     <span><span style={{color:"#78909C"}}>{fmtShort(r.rdv_date)} à {r.slot}</span> · <strong style={{color:NAVY}}>{r.service_icon} {r.service_title}</strong> {r.status==="cancelled"&&<Badge bg="#FCE4EC" color="#C62828">Annulé</Badge>} {r.status==="completed"&&<Badge bg="#EDE7F6" color="#4527A0">Effectué</Badge>}</span>
-                    {r.docs?.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{r.docs.map(d=><Badge key={d} bg="#F3E5F5" color="#6A1B9A">📎 {d}</Badge>)}</div>}
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                      {r.docs?.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{r.docs.map(d=><Badge key={d} bg="#F3E5F5" color="#6A1B9A">📎 {d}</Badge>)}</div>}
+                      <button onClick={()=>deleteRdv(r)} style={{background:"#FCE4EC",border:"none",color:"#C62828",borderRadius:7,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>🗑 Supprimer</button>
+                    </div>
                   </div>
                 ))
               }
