@@ -915,16 +915,46 @@ function AdminDashboard({ onBack }) {
     if (!authed) return;
     if (DEMO) {
       setRdvs([...STORE.appointments]);
-      setPatients([...STORE.users]);
+      // Build patient list from appointments in demo too
+      const patMap = {};
+      STORE.appointments.forEach(a=>{
+        if(!patMap[a.patient_email]){
+          patMap[a.patient_email]={
+            id:a.patient_id||a.patient_email,
+            email:a.patient_email,
+            prenom:a.patient_name?.split(" ")[0]||"",
+            nom:a.patient_name?.split(" ").slice(1).join(" ")||"",
+            tel:a.patient_tel||"",
+            created_at:a.created_at
+          };
+        }
+      });
+      setPatients(Object.values(patMap).sort((a,b)=>a.nom.localeCompare(b.nom)));
       setBlocked([...STORE.blocked]);
     } else {
       Promise.all([
         db.get("appointments","order=rdv_date.asc",SB_KEY),
-        db.get("profiles","order=created_at.desc",SB_KEY),
         db.get("blocked_slots","order=blocked_date.asc",SB_KEY)
-      ]).then(([r,p,b])=>{
-        if(Array.isArray(r))setRdvs(r);
-        if(Array.isArray(p))setPatients(p);
+      ]).then(([r,b])=>{
+        if(Array.isArray(r)){
+          setRdvs(r);
+          // Build unique patient list from appointments
+          const patMap = {};
+          r.forEach(a=>{
+            const key = a.patient_email;
+            if(!patMap[key]){
+              patMap[key]={
+                id: a.patient_id||a.patient_email,
+                email: a.patient_email,
+                prenom: a.patient_name?.split(" ")[0]||"",
+                nom: a.patient_name?.split(" ").slice(1).join(" ")||"",
+                tel: a.patient_tel||"",
+                created_at: a.created_at,
+              };
+            }
+          });
+          setPatients(Object.values(patMap).sort((a,b)=>a.nom.localeCompare(b.nom)));
+        }
         if(Array.isArray(b))setBlocked(b);
       }).catch(e=>console.error("Admin load error:",e));
     }
@@ -933,12 +963,15 @@ function AdminDashboard({ onBack }) {
   const openPat = (pt) => {
     setSelPat(pt);
     if (DEMO) {
-      setPatRdvs(STORE.appointments.filter(a=>a.patient_id===pt.id));
+      setPatRdvs(STORE.appointments.filter(a=>a.patient_email===pt.email));
       setPatNotes(STORE.notes.filter(n=>n.patient_id===pt.id));
-      setPatQ(STORE.questionnaires.filter(q=>q.patient_id===pt.id));
+      setPatQ(STORE.questionnaires.filter(q=>q.patient_email===pt.email));
     } else {
-      Promise.all([db.get("appointments",`patient_id=eq.${pt.id}&order=rdv_date.desc`),db.get("admin_notes",`patient_id=eq.${pt.id}&order=created_at.desc`),db.get("questionnaires",`patient_id=eq.${pt.id}&order=created_at.desc`)])
-        .then(([r,n,q])=>{ if(Array.isArray(r))setPatRdvs(r); if(Array.isArray(n))setPatNotes(n); if(Array.isArray(q))setPatQ(q); });
+      Promise.all([
+        db.get("appointments",`patient_email=eq.${pt.email}&order=rdv_date.desc`,SB_KEY),
+        db.get("admin_notes",`patient_id=eq.${pt.id}&order=created_at.desc`,SB_KEY),
+        db.get("questionnaires",`patient_email=eq.${pt.email}&order=created_at.desc`,SB_KEY)
+      ]).then(([r,n,q])=>{ if(Array.isArray(r))setPatRdvs(r); if(Array.isArray(n))setPatNotes(n); if(Array.isArray(q))setPatQ(q); });
     }
     setTab("fiche");
   };
