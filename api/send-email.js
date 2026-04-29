@@ -31,8 +31,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         sender: {
-          name: "VITASCIENZELAB",
-          email: "contact@herboristeriechampenoise.com",
+          name: "VITASCIENZELAB – Herboristerie Champenoise",
+          email: "herboristeriechampenoise@gmail.com",
         },
         to: [{ email: to }],
         subject,
