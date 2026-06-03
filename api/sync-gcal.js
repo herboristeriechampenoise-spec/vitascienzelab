@@ -1,3 +1,4 @@
+// Force redeploy to apply new Vercel env variables
 import crypto from "crypto";
 
 // Helper method to obtain access token from Google OAuth
