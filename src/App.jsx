@@ -13050,6 +13050,8 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
               let appt = ue.appointments.find(item => item.id === c.id);
               if (appt) appt.gcal_event_id = gcalEventId;
             }
+            R(prev => prev.map(item => item.id === c.id ? { ...item, gcal_event_id: gcalEventId } : item));
+            gt(prev => prev.map(item => item.id === c.id ? { ...item, gcal_event_id: gcalEventId } : item));
           } catch (e) {
             console.error("Error processing GCal response:", e);
           }
