@@ -12703,6 +12703,13 @@ function Rg({
   useEffect(() => {
     if (t) if (ee) {
       R([...ue.appointments]);
+      try {
+        let localSynced = JSON.parse(localStorage.getItem("gcal_synced_ids") || "[]");
+        let syncedIds = ue.appointments.filter(y => y.gcal_event_id || localSynced.includes(y.id)).map(y => y.id);
+        Dr(syncedIds);
+      } catch (e) {
+        console.error("Local mock sync init error:", e);
+      }
       let c = {};
       ue.appointments.forEach(y => {
         y.patient_email && !c[y.patient_email] && (c[y.patient_email] = {
@@ -12715,7 +12722,17 @@ function Rg({
         });
       }), B(Object.values(c).filter(y => y.email && y.email.trim() !== "").sort((y, b) => (y.nom || "").localeCompare(b.nom || ""))), Y([...ue.blocked]);
     } else Promise.all([X.get("appointments", "status=neq.archived&order=rdv_date.asc", j), X.get("profiles", "order=created_at.desc", j), X.get("blocked_slots", "order=blocked_date.asc", j)]).then(([c, y, b]) => {
-      Array.isArray(c) && R(c), Array.isArray(b) && Y(b);
+      if (Array.isArray(c)) {
+        R(c);
+        try {
+          let localSynced = JSON.parse(localStorage.getItem("gcal_synced_ids") || "[]");
+          let syncedIds = c.filter(item => item.gcal_event_id || localSynced.includes(item.id)).map(item => item.id);
+          Dr(syncedIds);
+        } catch (e) {
+          console.error("Local sync init error:", e);
+        }
+      }
+      Array.isArray(b) && Y(b);
       let _ = {},
         G = {};
       Array.isArray(y) && y.forEach(N => {
@@ -13010,9 +13027,45 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
           },
           body: JSON.stringify(Z0(c))
         });
-        return y.ok ? (Dr(_ => [..._, c.id]), !0) : ((await y.json()).error?.code === 401 && (Bu(!1), La(null), gn("Session Google expir\xE9e. Reconnectez-vous.")), !1);
+        if (y.ok) {
+          try {
+            const eventData = await y.json();
+            const gcalEventId = eventData.id || "synced";
+            try {
+              let localSynced = JSON.parse(localStorage.getItem("gcal_synced_ids") || "[]");
+              if (!localSynced.includes(c.id)) {
+                localSynced.push(c.id);
+                localStorage.setItem("gcal_synced_ids", JSON.stringify(localSynced));
+              }
+            } catch (err) {
+              console.error("Local storage sync save error:", err);
+            }
+            if (!ee) {
+              await X.patch("appointments", c.id, {
+                gcal_event_id: gcalEventId
+              }, j).catch(err => {
+                console.error("Supabase patch error:", err);
+              });
+            } else {
+              let appt = ue.appointments.find(item => item.id === c.id);
+              if (appt) appt.gcal_event_id = gcalEventId;
+            }
+          } catch (e) {
+            console.error("Error processing GCal response:", e);
+          }
+          Dr(_ => [..._, c.id]);
+          return !0;
+        } else {
+          let errBody = await y.json().catch(() => ({}));
+          if (errBody.error?.code === 401) {
+            Bu(!1);
+            La(null);
+            gn("Session Google expirée. Reconnectez-vous.");
+          }
+          return !1;
+        }
       } catch {
-        return gn("Erreur r\xE9seau Google Calendar."), !1;
+        return gn("Erreur réseau Google Calendar."), !1;
       }
     },
     X0 = async () => {
