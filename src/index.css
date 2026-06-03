@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #EBF0FE;
+}
+
+button {
+  transition: all .15s;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+input, textarea, select {
+  font-family: 'DM Sans', sans-serif;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #EBF0FE;
+  z-index: 9999;
+  gap: 20px;
+}
+
+.spin {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #C5DFF8;
+  border-top-color: #1565C0;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
