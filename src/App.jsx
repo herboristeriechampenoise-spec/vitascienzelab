@@ -13228,6 +13228,27 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             historical_docs: y
           }));
         }
+        if (c.gcal_event_id) {
+          try {
+            let localSynced = JSON.parse(localStorage.getItem("gcal_synced_ids") || "[]");
+            localSynced = localSynced.filter(id => id !== c.id);
+            localStorage.setItem("gcal_synced_ids", JSON.stringify(localSynced));
+          } catch (e) {
+            console.error("Local storage delete sync error:", e);
+          }
+          if (mn) {
+            try {
+              await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${c.gcal_event_id}`, {
+                method: "DELETE",
+                headers: {
+                  Authorization: `Bearer ${mn}`
+                }
+              });
+            } catch (gcalErr) {
+              console.error("GCal delete error:", gcalErr);
+            }
+          }
+        }
         ee ? ue.appointments = ue.appointments.filter(y => y.id !== c.id) : await fetch(`${Ge}/rest/v1/appointments?id=eq.${c.id}`, {
           method: "DELETE",
           headers: {
