@@ -115,6 +115,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Malformed credentials keys" });
   }
 
+  const calendarId = process.env.GOOGLE_CALENDAR_ID || "herboristeriechampenoise@gmail.com";
+
   const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://zbavzvcnmlwbsepfsnbi.supabase.co";
   const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_ROLE;
   if (!supabaseServiceKey) {
@@ -133,7 +135,7 @@ export default async function handler(req, res) {
       // Create new event in Google Calendar
       if (record.status === "confirmed") {
         const gcalEvent = makeGCalEvent(record);
-        const gcalRes = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+        const gcalRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -187,7 +189,7 @@ export default async function handler(req, res) {
       if (record.status === "cancelled" || record.status === "archived" || record.status === "completed") {
         // Delete Google Calendar event if appointment is cancelled/archived
         if (eventId) {
-          await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+          await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${accessToken}`
@@ -214,7 +216,7 @@ export default async function handler(req, res) {
         if (eventId) {
           // Update existing Google Calendar event
           const gcalEvent = makeGCalEvent(record);
-          const gcalRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+          const gcalRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`, {
             method: "PUT",
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -233,7 +235,7 @@ export default async function handler(req, res) {
         } else {
           // Re-create event if it didn't exist (self-healing)
           const gcalEvent = makeGCalEvent(record);
-          const gcalRes = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+          const gcalRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -265,7 +267,7 @@ export default async function handler(req, res) {
     if (type === "DELETE") {
       const eventId = oldRecord ? oldRecord.gcal_event_id : null;
       if (eventId) {
-        await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+        await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${accessToken}`
