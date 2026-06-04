@@ -116,7 +116,7 @@ export default async function handler(req, res) {
   }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://zbavzvcnmlwbsepfsnbi.supabase.co";
-  const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_ROLE || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiYXZ6dmNubWx3YnNlcGZzbmJpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzM3MTUzMSwiZXhwIjoyMDkyOTQ3NTMxfQ.DuojLIZQQTa_pRWMYWm37sm60IGSXudR6Rrzoc_qm-0";
+  const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_ROLE;
   if (!supabaseServiceKey) {
     console.error("VITE_SUPABASE_SERVICE_ROLE key is missing");
     return res.status(500).json({ error: "Missing database admin credentials" });
