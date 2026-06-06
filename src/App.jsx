@@ -8757,6 +8757,7 @@ const k0 = on((bv, N0) => {
 });
 const Ge = import.meta.env.VITE_SUPABASE_URL || "https://zbavzvcnmlwbsepfsnbi.supabase.co";
 const j = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiYXZ6dmNubWx3YnNlcGZzbmJpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNzE1MzEsImV4cCI6MjA5Mjk0NzUzMX0.yn8SfqytABe0DxjMGgJMK-ZFo3yrDDbn4Lx-b-uGz0I";
+let activeSessionToken = null;
 const ee = Ge.includes("VOTRE");
 const Sg = "692312814786-4mrf2rt3us6kkrhqdai4624puhisrog2.apps.googleusercontent.com";
 const ju = (e, t) => {
@@ -9058,7 +9059,7 @@ const tn = e => {
 };
 const Ki = e => ({
   apikey: j,
-  Authorization: `Bearer ${e || j}`,
+  Authorization: `Bearer ${e || activeSessionToken || j}`,
   "Content-Type": "application/json",
   Prefer: "return=representation"
 });
@@ -12694,12 +12695,22 @@ function Rg({
       S(!0), r(!1);
       try {
         let c = await Ii.signIn(i, l);
-        c.error || c.msg || !c.user ? r(!0) : n(!0);
+        if (c.error || c.msg || !c.user) {
+          r(!0);
+        } else {
+          activeSessionToken = c.access_token;
+          n(!0);
+        }
       } catch {
         r(!0);
       }
       S(!1);
     };
+  useEffect(() => {
+    return () => {
+      activeSessionToken = null;
+    };
+  }, []);
   useEffect(() => {
     if (t) if (ee) {
       R([...ue.appointments]);
