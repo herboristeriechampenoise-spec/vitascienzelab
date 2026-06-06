@@ -15166,10 +15166,14 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             };
             return getFollowUpDays(b) - getFollowUpDays(a);
           }
-          // Default: sort alphabetically by displayed name, stripping leading special characters
+          // Default: sort alphabetically by last name (nom), then first name (prenom)
           const getSortName = c => {
-            const disp = c.prenom || c.nom ? `${c.prenom} ${c.nom}`.trim() : c.email;
-            return disp.replace(/^[^a-zA-ZÀ-ÿ0-9]+/g, "").trim().toLowerCase();
+            const nom = (c.nom || "").replace(/^[^a-zA-ZÀ-ÿ0-9]+/g, "").trim().toLowerCase();
+            const prenom = (c.prenom || "").replace(/^[^a-zA-ZÀ-ÿ0-9]+/g, "").trim().toLowerCase();
+            if (nom && prenom) return `${nom} ${prenom}`;
+            if (nom) return nom;
+            if (prenom) return prenom;
+            return (c.email || "").trim().toLowerCase();
           };
           return getSortName(a).localeCompare(getSortName(b));
         }).map(c => {
@@ -15217,7 +15221,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   fontSize: 15,
                   color: z
                 },
-                children: c.prenom || c.nom ? `${c.prenom} ${c.nom}`.trim() : c.email
+                children: c.prenom || c.nom ? `${(c.nom || "").toUpperCase()} ${c.prenom || ""}`.trim() : c.email
               }), _jsxs("div", {
                 style: {
                   display: "flex",
