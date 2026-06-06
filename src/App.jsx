@@ -15229,17 +15229,39 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   flexWrap: "wrap",
                   marginTop: 3
                 },
-                children: [y.length === 0 && _jsx("span", {
-                  style: {
-                    background: "#E8F5E9",
-                    color: "#2E7D32",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "2px 8px",
-                    borderRadius: 20
-                  },
-                  children: "\u{1F195} Nouveau"
-                }), (() => {
+                children: [
+                  c.has_account ? _jsx("span", {
+                    style: {
+                      background: "#E3F2FD",
+                      color: "#1565C0",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 20
+                    },
+                    children: "\u{1F464} Compte cr\xE9\xE9"
+                  }) : _jsx("span", {
+                    style: {
+                      background: "#ECEFF1",
+                      color: "#455A64",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 20
+                    },
+                    children: "\u{1F4CB} Fiche admin"
+                  }),
+                  y.length === 0 && _jsx("span", {
+                    style: {
+                      background: "#E8F5E9",
+                      color: "#2E7D32",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 20
+                    },
+                    children: "\u{1F195} Nouveau"
+                  }), (() => {
                   let H = y.filter(N => N.status !== "cancelled").sort((N, K) => (K.rdv_date || "").localeCompare(N.rdv_date || ""))[0];
                   if (!H) return null;
                   let F = Math.floor((Date.now() - new Date(H.rdv_date + "T12:00:00")) / 864e5);
