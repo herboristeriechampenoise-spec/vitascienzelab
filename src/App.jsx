@@ -13145,7 +13145,7 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
           slot: "",
           notes: "",
           recurring: !1
-        }), setTimeout(() => Tr(!1), 4e3), mn && (await Ou(b)), b.patient_email && b.patient_email !== "\u2014" && (await jn(b.patient_email, "\u2705 Votre s\xE9ance est confirm\xE9e \u2014 VITASCIENZELAB", Ji(b, "confirm")));
+        }), setTimeout(() => Tr(!1), 4e3), b.patient_email && b.patient_email !== "\u2014" && (await jn(b.patient_email, "\u2705 Votre s\xE9ance est confirm\xE9e \u2014 VITASCIENZELAB", Ji(b, "confirm")));
       } catch (_) {
         console.error(_);
       }

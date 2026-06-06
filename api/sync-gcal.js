@@ -46,6 +46,18 @@ async function getAccessToken(clientEmail, privateKey) {
   return tokenData.access_token;
 }
 
+// Helper to calculate Paris timezone offset dynamically
+function getParisOffset(dateString) {
+  const d = new Date(dateString + "T12:00:00Z");
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Paris",
+    hour: "numeric",
+    hour12: false
+  });
+  const parisHour = parseInt(formatter.format(d), 10);
+  return parisHour - 12;
+}
+
 // Helper to format event payload for Google Calendar
 function makeGCalEvent(record) {
   const serviceDurations = {
@@ -53,11 +65,12 @@ function makeGCalEvent(record) {
     suivi: 45
   };
   const duration = serviceDurations[record.service_id] || 45;
-  const [hours, minutes] = record.slot.split(":").map(Number);
 
-  const startTime = new Date(record.rdv_date + "T00:00:00");
-  startTime.setHours(hours, minutes, 0, 0);
+  const offset = getParisOffset(record.rdv_date);
+  const offsetString = "+" + String(offset).padStart(2, "0") + ":00";
+  const localDateTimeString = `${record.rdv_date}T${record.slot.padStart(5, '0')}:00${offsetString}`;
 
+  const startTime = new Date(localDateTimeString);
   const endTime = new Date(startTime.getTime() + duration * 60000);
 
   return {
