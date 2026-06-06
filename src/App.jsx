@@ -15166,14 +15166,10 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             };
             return getFollowUpDays(b) - getFollowUpDays(a);
           }
-          // Default: sort by last name (nom), then first name (prenom) alphabetically
+          // Default: sort alphabetically by displayed name, stripping leading special characters
           const getSortName = c => {
-            const nom = (c.nom || "").trim().toLowerCase();
-            const prenom = (c.prenom || "").trim().toLowerCase();
-            if (nom && prenom) return `${nom} ${prenom}`;
-            if (nom) return nom;
-            if (prenom) return prenom;
-            return (c.email || "").trim().toLowerCase();
+            const disp = c.prenom || c.nom ? `${c.prenom} ${c.nom}`.trim() : c.email;
+            return disp.replace(/^[^a-zA-ZÀ-ÿ0-9]+/g, "").trim().toLowerCase();
           };
           return getSortName(a).localeCompare(getSortName(b));
         }).map(c => {
