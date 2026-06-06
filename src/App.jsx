@@ -15147,7 +15147,36 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               children: "Trier par suivi requis"
             })]
           })]
-        }), w.filter(c => !De || `${c.prenom} ${c.nom} ${c.email}`.toLowerCase().includes(De.toLowerCase())).map(c => {
+        }), [...w].filter(c => !De || `${c.prenom} ${c.nom} ${c.email}`.toLowerCase().includes(De.toLowerCase())).sort((a, b) => {
+          if (wt === "date") {
+            return (b.created_at || "").localeCompare(a.created_at || "");
+          }
+          if (wt === "seances") {
+            const countA = p.filter(h => h.patient_id === a.id).length;
+            const countB = p.filter(h => h.patient_id === b.id).length;
+            return countB - countA;
+          }
+          if (wt === "suivi") {
+            const getFollowUpDays = c => {
+              const sessions = p.filter(h => h.patient_id === c.id && h.status !== "cancelled");
+              if (sessions.length === 0) return -1;
+              const last = [...sessions].sort((x, y) => (y.rdv_date || "").localeCompare(x.rdv_date || ""))[0];
+              if (!last || !last.rdv_date) return -1;
+              return Math.floor((Date.now() - new Date(last.rdv_date + "T12:00:00")) / 864e5);
+            };
+            return getFollowUpDays(b) - getFollowUpDays(a);
+          }
+          // Default: sort by last name (nom), then first name (prenom) alphabetically
+          const getSortName = c => {
+            const nom = (c.nom || "").trim().toLowerCase();
+            const prenom = (c.prenom || "").trim().toLowerCase();
+            if (nom && prenom) return `${nom} ${prenom}`;
+            if (nom) return nom;
+            if (prenom) return prenom;
+            return (c.email || "").trim().toLowerCase();
+          };
+          return getSortName(a).localeCompare(getSortName(b));
+        }).map(c => {
           let y = p.filter(H => H.patient_id === c.id),
             b = y.filter(H => !at(H) && H.status === "confirmed").sort((H, F) => H.rdv_date.localeCompare(F.date))[0],
             _ = y.filter(H => at(H)).sort((H, F) => F.date.localeCompare(H.rdv_date))[0],
