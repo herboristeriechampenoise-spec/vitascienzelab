@@ -9059,7 +9059,7 @@ const tn = e => {
 };
 const Ki = e => ({
   apikey: j,
-  Authorization: `Bearer ${e || activeSessionToken || j}`,
+  Authorization: `Bearer ${e && e !== j ? e : (activeSessionToken || j)}`,
   "Content-Type": "application/json",
   Prefer: "return=representation"
 });
@@ -11176,8 +11176,8 @@ function Bg({
       f(ue.appointments);
       return;
     }
-    Promise.all([X.get("appointments", "status=neq.archived&order=rdv_date.asc", j), X.get("blocked_slots", "order=blocked_date.asc", j)]).then(([x, U]) => {
-      Array.isArray(x) && f(x.filter(re => re.status === "confirmed")), Array.isArray(U) && d(U);
+    fetch("/api/get-busy-slots").then(res => res.json()).then(res => {
+      Array.isArray(res.appointments) && f(res.appointments), Array.isArray(res.blockedSlots) && d(res.blockedSlots);
     }).catch(() => {});
   }, []);
   let [h, w] = useState(!1),
