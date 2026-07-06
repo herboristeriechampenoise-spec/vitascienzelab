@@ -11097,7 +11097,7 @@ function Tg({
               color: "#6A1B9A",
               marginBottom: 6
             },
-            children: "⬇️ Documents reçus de mon thérapeute"
+            children: "⬇️ Documents reçus de VitaScienzeLab"
           }),
           _jsx("p", {
             style: {
@@ -11192,7 +11192,7 @@ function Tg({
               color: "#78909C",
               marginBottom: 10
             },
-            children: "Déposez ici vos analyses, ordonnances ou documents pour votre thérapeute."
+            children: "Déposez ici vos analyses, ordonnances ou documents."
           }),
           clientFiles.length === 0 ? _jsx("p", {
             style: {
@@ -16354,7 +16354,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                         borderRadius: 4,
                         fontWeight: 700
                       },
-                      children: isFromClient ? "Client" : "Thérapeute"
+                      children: isFromClient ? "Client" : "VitaScienzeLab"
                     })
                   ]
                 }), _jsx("div", {
