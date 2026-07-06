@@ -14065,16 +14065,17 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   let y = yn[ie.service_id] || 60,
                     b = Math.ceil(y / 30),
                     _ = Je.indexOf(c),
-                    H = p.filter(F => F.rdv_date === ie.rdv_date && F.status === "confirmed").some(F => {
+                    isConflict = p.filter(F => F.rdv_date === ie.rdv_date && F.status === "confirmed").some(F => {
                       let N = Je.indexOf(F.slot),
                         K = yn[F.service_id] || 60,
                         P = Math.ceil(K / 30);
                       return _ >= N && _ < N + P || _ < N && _ + b > N;
-                    }) || _ + b > Je.length;
+                    }),
+                    isOverflow = _ + b > Je.length;
                   return _jsxs("option", {
                     value: c,
-                    disabled: H,
-                    children: [c, H ? " \u2014 indisponible" : ""]
+                    disabled: isOverflow,
+                    children: [c, isOverflow ? " — dépasse l'horaire" : isConflict ? " — occupé (double réservation autorisée)" : ""]
                   }, c);
                 })]
               }), dt.slot && _jsx("span", {
@@ -14121,10 +14122,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       Ht = Math.ceil(Ye / 30);
                     return _ >= P && _ < P + Ht || _ < P && _ + b > P;
                   }),
-                  F = _ + b > Je.length,
-                  N = !!H || F;
+                  F = _ + b > Je.length;
                 return _jsxs("div", {
-                  onClick: () => !N && Ft(K => ({
+                  onClick: () => !F && Ft(K => ({
                     ...K,
                     slot: c
                   })),
@@ -14133,10 +14133,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                     borderRadius: 8,
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: N ? "not-allowed" : "pointer",
-                    background: ie.slot === c ? q : N ? "#FCE4EC" : "#E8F0FE",
-                    color: ie.slot === c ? "#fff" : N ? "#C62828" : q,
-                    textDecoration: N ? "line-through" : "none",
+                    cursor: F ? "not-allowed" : "pointer",
+                    background: ie.slot === c ? q : F ? "#ECEFF1" : H ? "#FFEBEE" : "#E8F0FE",
+                    color: ie.slot === c ? "#fff" : F ? "#BDBDBD" : H ? "#C62828" : q,
                     userSelect: "none"
                   },
                   children: [c, H ? ` (${H.patient_name?.split(" ")[0]})` : ""]
