@@ -16150,28 +16150,39 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   if (loadedCount === files.length) {
                     const finalFiles = [...currentFiles, ...newFilesList];
                     if (!ee) {
-                      await X.patch("profiles", O.id, {
-                        client_files: finalFiles
-                      }, j);
-                      if (O.email && O.email !== "—" && O.email.includes("@")) {
-                        const emailSubject = "📄 Nouveau document disponible — VITASCIENZELAB";
-                        const emailHtml = `<div style="font-family:sans-serif;padding:20px;max-width:500px">
-                          <h2 style="color:#1565C0">Nouveau document disponible</h2>
-                          <p>Bonjour ${O.prenom || ""},</p>
-                          <p>Un ou plusieurs nouveaux documents ont été ajoutés à votre dossier sur votre espace client :</p>
-                          <blockquote style="background:#F5F5F5;padding:12px;border-left:4px solid #1565C0;margin:16px 0;border-radius:4px;">
-                            <strong>${files.length > 1 ? "Fichiers ajoutés :" : "Fichier ajouté :"}</strong><br/>
-                            ${newFilesList.map(f => `• ${f.name}`).join("<br/>")}
-                          </blockquote>
-                          <p>Vous pouvez vous connecter à votre compte pour les consulter et les télécharger :</p>
-                          <div style="margin:20px 0;">
-                            <a href="https://vitascienzelab.vercel.app" style="background:#1565C0;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;font-weight:bold;display:inline-block;">Accéder à mon espace client</a>
-                          </div>
-                          <p style="color:#546E7A;font-size:12px">Si vous n'avez pas encore créé de compte, vous pouvez le faire en utilisant cette même adresse e-mail (${O.email}) pour y retrouver automatiquement vos documents.</p>
-                          <hr style="border:none;border-top:1px solid #ECEFF1;margin:20px 0;"/>
-                          <p style="color:#90A4AE;font-size:11px">VITASCIENZELAB &middot; Herboristerie Champenoise</p>
-                        </div>`;
-                        jn(O.email, emailSubject, emailHtml).catch(err => console.error("Error sending file email:", err));
+                      try {
+                        const patchRes = await X.patch("profiles", O.id, {
+                          client_files: finalFiles
+                        }, j);
+                        if (patchRes && (patchRes.error || patchRes.code)) {
+                          console.error("Supabase patch failed:", patchRes);
+                          alert("Erreur lors de la sauvegarde du fichier dans la base de données.");
+                          return;
+                        }
+                        if (O.email && O.email !== "—" && O.email.includes("@")) {
+                          const emailSubject = "📄 Nouveau document disponible — VITASCIENZELAB";
+                          const emailHtml = `<div style="font-family:sans-serif;padding:20px;max-width:500px">
+                            <h2 style="color:#1565C0">Nouveau document disponible</h2>
+                            <p>Bonjour ${O.prenom || ""},</p>
+                            <p>Un ou plusieurs nouveaux documents ont été ajoutés à votre dossier sur votre espace client :</p>
+                            <blockquote style="background:#F5F5F5;padding:12px;border-left:4px solid #1565C0;margin:16px 0;border-radius:4px;">
+                              <strong>${files.length > 1 ? "Fichiers ajoutés :" : "Fichier ajouté :"}</strong><br/>
+                              ${newFilesList.map(f => `• ${f.name}`).join("<br/>")}
+                            </blockquote>
+                            <p>Vous pouvez vous connecter à votre compte pour les consulter et les télécharger :</p>
+                            <div style="margin:20px 0;">
+                              <a href="https://vitascienzelab.vercel.app" style="background:#1565C0;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;font-weight:bold;display:inline-block;">Accéder à mon espace client</a>
+                            </div>
+                            <p style="color:#546E7A;font-size:12px">Si vous n'avez pas encore créé de compte, vous pouvez le faire en utilisant cette même adresse e-mail (${O.email}) pour y retrouver automatiquement vos documents.</p>
+                            <hr style="border:none;border-top:1px solid #ECEFF1;margin:20px 0;"/>
+                            <p style="color:#90A4AE;font-size:11px">VITASCIENZELAB &middot; Herboristerie Champenoise</p>
+                          </div>`;
+                          await jn(O.email, emailSubject, emailHtml);
+                        }
+                      } catch (err) {
+                        console.error("File upload patch/email error:", err);
+                        alert("Une erreur est survenue lors de l'enregistrement ou de la notification.");
+                        return;
                       }
                     }
                     L(N => ({
@@ -16188,7 +16199,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               });
               c.target.value = "";
             }
-          }), _jsx("button", {
+          }), O.has_account ? _jsx("button", {
             onClick: () => document.getElementById("clientFileInput").click(),
             style: {
               background: "#F3E5F5",
@@ -16202,7 +16213,21 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               marginTop: 4,
               fontWeight: 600
             },
-            children: "+ D\xE9poser un fichier (facture, document\u2026)"
+            children: "+ Déposer un fichier (facture, document…)"
+          }) : _jsx("div", {
+            style: {
+              background: "#FFF3E0",
+              border: "1px solid #FFE0B2",
+              color: "#E65100",
+              borderRadius: 8,
+              padding: "10px 12px",
+              fontSize: 11,
+              marginTop: 4,
+              fontWeight: 500,
+              textAlign: "center",
+              lineHeight: "1.4"
+            },
+            children: "⚠️ Pour déposer des fichiers, ce client doit d'abord créer son compte en ligne avec l'adresse : " + (O.email || "—")
           })]
         }), _jsxs("div", {
           style: {
