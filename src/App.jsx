@@ -11190,9 +11190,10 @@ function Tg({
             style: {
               fontSize: 11,
               color: "#78909C",
-              marginBottom: 10
+              marginBottom: 10,
+              lineHeight: "1.4"
             },
-            children: "Déposez ici vos analyses, ordonnances ou documents."
+            children: "Déposez ici vos documents (analyses, ordonnances, comptes rendus…) pour faciliter votre suivi bien-être. Partage sécurisé et confidentiel à titre informatif (ne remplace pas un avis médical)."
           }),
           clientFiles.length === 0 ? _jsx("p", {
             style: {
