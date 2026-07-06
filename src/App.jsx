@@ -12874,6 +12874,7 @@ function Rg({
       reason: ""
     }),
     [Pt, hl] = useState(new Date().getMonth()),
+    [sendingEmails, setSendingEmails] = useState(!1),
     [x, U] = useState(new Date().getFullYear()),
     [re, rt] = useState("all"),
     [wt, bl] = useState("nom"),
@@ -15398,11 +15399,50 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               children: "Trier par inscription"
             }), _jsx("option", {
               value: "seances",
-              children: "Trier par nb de s\xE9ances"
+              children: "Trier par nb de séances"
             }), _jsx("option", {
               value: "suivi",
               children: "Trier par suivi requis"
             })]
+          }), _jsx("button", {
+            disabled: sendingEmails,
+            onClick: async () => {
+              if (!window.confirm("Envoyer l'e-mail de suivi métabolique mensuel à tous vos clients (avec ou sans compte) ?")) return;
+              setSendingEmails(!0);
+              try {
+                const res = await fetch("/api/send-monthly-reminders", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${activeSessionToken || j}`
+                  }
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  alert(`📧 Succès : e-mails envoyés à ${data.sent} client(s) (${data.failed} échec(s)).`);
+                } else {
+                  alert(`❌ Erreur : ${data.error || "Impossible d'envoyer les e-mails."}`);
+                }
+              } catch (err) {
+                console.error("Manual reminders trigger error:", err);
+                alert("❌ Une erreur est survenue lors de la communication avec le serveur.");
+              } finally {
+                setSendingEmails(!1);
+              }
+            },
+            style: {
+              background: sendingEmails ? "#E0E0E0" : "#E0F2F1",
+              border: "1px solid #80CBC4",
+              color: "#004D40",
+              borderRadius: 10,
+              padding: "8px 16px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: sendingEmails ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            },
+            children: sendingEmails ? "Envoi en cours..." : "✉️ Rappel mensuel global"
           })]
         }), [...w].filter(c => !De || `${c.prenom} ${c.nom} ${c.email}`.toLowerCase().includes(De.toLowerCase())).sort((a, b) => {
           if (wt === "date") {
