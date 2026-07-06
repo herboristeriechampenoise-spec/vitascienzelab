@@ -1,6 +1,14 @@
 const Ge = "https://zbavzvcnmlwbsepfsnbi.supabase.co";
 
 export default async function handler(req, res) {
+  const BREVO_KEY = process.env.BREVO_API_KEY;
+  const SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE;
+
+  if (!BREVO_KEY || !SERVICE_KEY) {
+    console.error("Missing keys on server. BREVO_KEY or SERVICE_KEY.");
+    return res.status(500).json({ error: "Missing configuration keys" });
+  }
+
   // 1. Authorization check (allow Vercel Cron or authenticated Admin user)
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.authorization;
@@ -13,7 +21,7 @@ export default async function handler(req, res) {
       // Validate admin token against Supabase Auth
       const userRes = await fetch(`${Ge}/auth/v1/user`, {
         headers: {
-          apikey: process.env.VITE_SUPABASE_ANON_KEY || "",
+          apikey: process.env.VITE_SUPABASE_ANON_KEY || SERVICE_KEY || "",
           Authorization: authHeader
         }
       });
@@ -30,14 +38,6 @@ export default async function handler(req, res) {
 
   if (!isVercelCron && !isAdmin) {
     return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const BREVO_KEY = process.env.BREVO_API_KEY;
-  const SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE;
-
-  if (!BREVO_KEY || !SERVICE_KEY) {
-    console.error("Missing keys on server. BREVO_KEY or SERVICE_KEY.");
-    return res.status(500).json({ error: "Missing configuration keys" });
   }
 
   try {
