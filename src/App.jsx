@@ -9066,7 +9066,7 @@ const Ki = e => ({
   apikey: j,
   Authorization: `Bearer ${e && e !== j ? e : (activeSessionToken || j)}`,
   "Content-Type": "application/json",
-  Prefer: "return=representation"
+  Prefer: "return=minimal"
 });
 const Ii = {
   signIn: (e, t) => fetch(`${Ge}/auth/v1/token?grant_type=password`, {
@@ -9101,12 +9101,12 @@ const X = {
     method: "POST",
     headers: Ki(n),
     body: JSON.stringify(t)
-  }).then(l => l.json()),
+  }).then(l => l.text().then(text => text ? JSON.parse(text) : {})),
   patch: (e, t, n, l) => fetch(`${Ge}/rest/v1/${e}?id=eq.${t}`, {
     method: "PATCH",
     headers: Ki(l),
     body: JSON.stringify(n)
-  }).then(a => a.json()),
+  }).then(a => a.text().then(text => text ? JSON.parse(text) : {})),
   del: (e, t, n) => fetch(`${Ge}/rest/v1/${e}?id=eq.${t}`, {
     method: "DELETE",
     headers: Ki(n)
@@ -11471,16 +11471,17 @@ function Bg({
           };
           delete U.supplements, delete U.docs_data;
           let re = await X.post("appointments", U, j);
-          if (console.log("Save result:", re), re && (Array.isArray(re) ? re[0]?.id : re?.id)) {
-            let rt = Array.isArray(re) ? re[0].id : re.id;
-            try {
-              await X.patch("appointments", rt, {
-                supplements: x.supplements || [],
-                docs_data: x.docs_data || []
-              }, j);
-            } catch (wt) {
-              console.log("Extra fields not saved:", wt);
-            }
+          console.log("Save result:", re);
+          if (re && (re.error || re.code || re.message)) {
+            throw new Error(re.message || "Database insert failed");
+          }
+          try {
+            await X.patch("appointments", x.id, {
+              supplements: x.supplements || [],
+              docs_data: x.docs_data || []
+            }, j);
+          } catch (wt) {
+            console.log("Extra fields not saved:", wt);
           }
         }
       } catch (U) {
