@@ -9112,6 +9112,45 @@ const X = {
     headers: Ki(n)
   }).then(l => l.ok)
 };
+const downloadBase64File = (base64Data, filename) => {
+  if (!base64Data) return;
+  try {
+    if (!base64Data.startsWith("data:")) {
+      const a = document.createElement("a");
+      a.href = base64Data;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+    const parts = base64Data.split(";base64,");
+    const contentType = parts[0].split(":")[1] || "application/octet-stream";
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+    const blob = new Blob([uInt8Array], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Failed to download file:", err);
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(`<iframe src="${base64Data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+    } else {
+      window.location.href = base64Data;
+    }
+  }
+};
 function Ag() {
   return _jsx("div", {
     style: {
@@ -11154,9 +11193,8 @@ function Tg({
                   })
                 ]
               }),
-              C.data && _jsx("a", {
-                href: C.data,
-                download: C.name,
+              C.data && _jsx("button", {
+                onClick: () => downloadBase64File(C.data, C.name),
                 style: {
                   background: "#6A1B9A",
                   color: "#fff",
@@ -11164,7 +11202,8 @@ function Tg({
                   padding: "7px 14px",
                   fontSize: 12,
                   fontWeight: 600,
-                  textDecoration: "none"
+                  border: "none",
+                  cursor: "pointer"
                 },
                 children: "⬇️ Télécharger"
               })
@@ -11249,9 +11288,8 @@ function Tg({
                   gap: 8
                 },
                 children: [
-                  C.data && _jsx("a", {
-                    href: C.data,
-                    download: C.name,
+                  C.data && _jsx("button", {
+                    onClick: () => downloadBase64File(C.data, C.name),
                     style: {
                       background: "#00695C",
                       color: "#fff",
@@ -11259,7 +11297,8 @@ function Tg({
                       padding: "7px 12px",
                       fontSize: 12,
                       fontWeight: 600,
-                      textDecoration: "none"
+                      border: "none",
+                      cursor: "pointer"
                     },
                     children: "⬇️"
                   }),
@@ -16190,9 +16229,8 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       },
                       children: D.fromProfile ? `S\xE9ance du ${Ke(D.from_rdv)} \xE0 ${D.from_slot || ""}` : `S\xE9ance du ${Ke(D.date)} \xE0 ${D.slot}`
                     })]
-                  }), D.data && _jsx("a", {
-                    href: D.data,
-                    download: D.name,
+                  }), D.data && _jsx("button", {
+                    onClick: () => downloadBase64File(D.data, D.name),
                     style: {
                       background: "#6A1B9A",
                       color: "#fff",
@@ -16200,9 +16238,10 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       padding: "5px 12px",
                       fontSize: 11,
                       fontWeight: 600,
-                      textDecoration: "none"
+                      border: "none",
+                      cursor: "pointer"
                     },
-                    children: "\u2B07 DL"
+                    children: "⬇ DL"
                   }), _jsx("button", {
                     onClick: async () => {
                       if (window.confirm(`Supprimer "${D.name}" ?`)) {
@@ -16406,9 +16445,8 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   },
                   children: c.date
                 })]
-              }), c.data && _jsx("a", {
-                href: c.data,
-                download: c.name,
+              }), c.data && _jsx("button", {
+                onClick: () => downloadBase64File(c.data, c.name),
                 style: {
                   background: isFromClient ? "#00695C" : "#6A1B9A",
                   color: "#fff",
@@ -16416,7 +16454,8 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   padding: "4px 10px",
                   fontSize: 11,
                   fontWeight: 600,
-                  textDecoration: "none"
+                  border: "none",
+                  cursor: "pointer"
                 },
                 children: "⬇️"
               }), _jsx("button", {
