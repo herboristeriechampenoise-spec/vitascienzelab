@@ -9065,8 +9065,7 @@ const tn = e => {
 const Ki = e => ({
   apikey: j,
   Authorization: `Bearer ${e && e !== j ? e : (activeSessionToken || j)}`,
-  "Content-Type": "application/json",
-  Prefer: "return=minimal"
+  "Content-Type": "application/json"
 });
 const Ii = {
   signIn: (e, t) => fetch(`${Ge}/auth/v1/token?grant_type=password`, {
@@ -9099,12 +9098,12 @@ const X = {
   }).then(l => l.json()),
   post: (e, t, n) => fetch(`${Ge}/rest/v1/${e}`, {
     method: "POST",
-    headers: Ki(n),
+    headers: { ...Ki(n), Prefer: "return=minimal" },
     body: JSON.stringify(t)
   }).then(l => l.text().then(text => text ? JSON.parse(text) : {})),
   patch: (e, t, n, l) => fetch(`${Ge}/rest/v1/${e}?id=eq.${t}`, {
     method: "PATCH",
-    headers: Ki(l),
+    headers: { ...Ki(l), Prefer: "return=minimal" },
     body: JSON.stringify(n)
   }).then(a => a.text().then(text => text ? JSON.parse(text) : {})),
   del: (e, t, n) => fetch(`${Ge}/rest/v1/${e}?id=eq.${t}`, {
