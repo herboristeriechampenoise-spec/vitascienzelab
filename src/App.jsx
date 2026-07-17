@@ -9826,7 +9826,7 @@ function Dg({
             O = [],
             L = [];
           try {
-            let de = await X.get("profiles", `id=eq.${M.id}`, j);
+            let de = await X.get("profiles", `id=eq.${M.id}`, B);
             Array.isArray(de) && de[0] && (O = de[0].client_files || [], L = de[0].guests || []);
           } catch {}
           e({
