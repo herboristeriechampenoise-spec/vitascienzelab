@@ -8803,7 +8803,8 @@ const jn = async (e, t, n) => {
 };
 const Ji = (e, t) => {
   let n = t === "48h",
-    l = e.patient_name?.split(" ")[0] || "";
+    l = e.patient_name?.split(" ")[0] || "",
+    loc = e.location && e.location.trim() ? e.location.trim() : "9 Rue du Champ Pile, 10320 Bouilly";
   return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px">
 <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden">
   <div style="background:linear-gradient(135deg,#003891,#1565C0);padding:28px;text-align:center">
@@ -8821,10 +8822,13 @@ const Ji = (e, t) => {
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(21,101,192,.1)"><span style="color:#78909C">\u{1F9EC} Prestation</span><strong style="color:#1A237E">${e.service_title}</strong></div>
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(21,101,192,.1)"><span style="color:#78909C">\u{1F4C5} Date</span><strong style="color:#1A237E">${vt(e.rdv_date)}</strong></div>
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(21,101,192,.1)"><span style="color:#78909C">\u{1F550} Heure</span><strong style="color:#1A237E">${e.slot}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#78909C">\u{1F4CD} Lieu</span><strong style="color:#1A237E">9 Rue du Champ Pile, 10320 Bouilly</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#78909C">\u{1F4CD} Lieu</span><strong style="color:#1A237E">${loc}</strong></div>
     </div>
     <div style="background:#FFF8E1;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#E65100;line-height:1.6">
       <strong>\u{1F4CE} \xC0 apporter :</strong> Pensez \xE0 ramener tout document utile (bilan sanguin, ordonnance\u2026). Non obligatoire mais tr\xE8s pr\xE9cieux.
+    </div>
+    <div style="margin:20px 0;text-align:center;">
+      <a href="https://vitascienzelab.vercel.app" style="background:#1565C0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:13px;display:inline-block;">🌐 Accéder à VitaScienzeLab</a>
     </div>
     ${n ? `<div style="background:#FCE4EC;border-radius:10px;padding:12px 14px;font-size:12px;color:#880E4F;line-height:1.6">
       \u26A0\uFE0F En cas d'emp\xEAchement, merci d'annuler au moins 24h \xE0 l'avance \xE0 contact@herboristeriechampenoise.com
@@ -13376,6 +13380,7 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
           slot: ie.slot,
           status: "confirmed",
           notes: ie.notes,
+          location: ie.location || "",
           recurring: ie.recurring,
           docs: [],
           reminder_sent: !1,
@@ -13420,6 +13425,7 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
           rdv_date: "",
           slot: "",
           notes: "",
+          location: "",
           recurring: !1
         }), setTimeout(() => Tr(!1), 4e3), b.patient_email && b.patient_email !== "\u2014" && (await jn(b.patient_email, "\u2705 Votre s\xE9ance est confirm\xE9e \u2014 VITASCIENZELAB", Ji(b, "confirm")));
       } catch (_) {
@@ -14459,6 +14465,36 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                 outline: "none",
                 minHeight: 70,
                 resize: "vertical"
+              }
+            })]
+          }), _jsxs("div", {
+            style: {
+              marginBottom: 12
+            },
+            children: [_jsx("label", {
+              style: {
+                display: "block",
+                fontSize: 12,
+                fontWeight: 600,
+                color: z,
+                marginBottom: 5
+              },
+              children: "\u{1F4CD} Lieu du rendez-vous (Optionnel)"
+            }), _jsx("input", {
+              value: ie.location || "",
+              onChange: c => Ft(y => ({
+                ...y,
+                location: c.target.value
+              })),
+              placeholder: "Par d\xE9faut : 9 Rue du Champ Pile, 10320 Bouilly (ou rdv \xE0 domicile, point spécifique...)",
+              style: {
+                width: "100%",
+                border: `2px solid ${V}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 13,
+                color: z,
+                outline: "none"
               }
             })]
           }), _jsxs("div", {
@@ -17311,11 +17347,23 @@ function Mg({
     [u, s] = useState("loading"),
     [r, v] = useState("");
   useEffect(() => {
-    e && X.get("appointments", `id=eq.${e}`, j).then(g => {
-      Array.isArray(g) && g.length > 0 ? (l(g[0]), X.get("questionnaires", `appointment_id=eq.${e}`, j).then(p => {
-        Array.isArray(p) && p.length > 0 ? s("already_done") : s("form");
-      })) : s("error");
-    });
+    if (!e) return;
+    fetch(`/api/get-questionnaire-info?id=${e}`).then(res => res.json()).then(data => {
+      if (data && data.success && data.appointment) {
+        l(data.appointment);
+        if (data.alreadyDone) {
+          s("already_done");
+        } else {
+          s("form");
+        }
+      } else {
+        X.get("appointments", `id=eq.${e}`, j).then(g => {
+          Array.isArray(g) && g.length > 0 ? (l(g[0]), X.get("questionnaires", `appointment_id=eq.${e}`, j).then(p => {
+            Array.isArray(p) && p.length > 0 ? s("already_done") : s("form");
+          })) : s("error");
+        }).catch(() => s("error"));
+      }
+    }).catch(() => s("error"));
   }, [e]);
   let S = async () => {
     if (Object.keys(a).length < 1) {
