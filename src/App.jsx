@@ -11377,6 +11377,13 @@ function Tg({
                           alert("Erreur lors de la sauvegarde du fichier.");
                           return;
                         }
+                        const clientFullName = `${e.prenom || ''} ${e.nom || ''}`.trim() || e.email;
+                        const uploadedNames = newFilesList.map(f => f.name).join(", ");
+                        X.post("admin_notes", {
+                          patient_id: e.id,
+                          note: `📁 NOUVEAU FICHIER CLIENT — ${clientFullName} a déposé le(s) fichier(s) : ${uploadedNames}`,
+                          created_at: new Date().toISOString()
+                        }, j).catch(() => {});
                       }
                       t({
                         ...e,
@@ -13705,9 +13712,10 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
       })]
     })]
   });
-  let Ur = p.filter(tn).length,
-    newFilesClientsCount = w.filter(c => (c.client_files || []).some(f => f.uploaded_by === "client" && f.is_new_for_admin === true)).length,
-    K0 = [["agenda", "\u{1F4C5} Agenda"], ["nouveau", "\u270F\uFE0F Nouveau RDV"], ["gcal", "\u{1F4C6} Google Agenda"], ["rdvs", Ur > 0 ? `\u{1F4CB} S\xE9ances \u{1F534}${Ur}` : "\u{1F4CB} S\xE9ances"], ["clients", "\u{1F465} Clients"], ["activite", "\u26A1 Activit\xE9"], ["stats", "\u{1F4CA} Statistiques"], ["dispo", "\u{1F512} Disponibilit\xE9s"]],
+  let newFileNotes = yl.filter(n => n.full && n.full.includes("NOUVEAU FICHIER CLIENT")),
+    Ur = p.filter(tn).length,
+    newFilesClientsCount = newFileNotes.length || w.filter(c => (c.client_files || []).some(f => f.uploaded_by === "client" && f.is_new_for_admin === true)).length,
+    K0 = [["agenda", "\u{1F4C5} Agenda"], ["nouveau", "\u270F\uFE0F Nouveau RDV"], ["gcal", "\u{1F4C6} Google Agenda"], ["rdvs", Ur > 0 ? `\u{1F4CB} S\xE9ances \u{1F534}${Ur}` : "\u{1F4CB} S\xE9ances"], ["clients", newFilesClientsCount > 0 ? `\u{1F465} Clients 🔴${newFilesClientsCount}` : "\u{1F465} Clients"], ["activite", newFileNotes.length > 0 ? `\u26A1 Activit\xE9 📁${newFileNotes.length}` : "\u26A1 Activit\xE9"], ["stats", "\u{1F4CA} Statistiques"], ["dispo", "\u{1F512} Disponibilit\xE9s"]],
     Vl = {
       width: "100%",
       border: `2px solid ${V}`,
@@ -13945,7 +13953,58 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
         margin: "0 auto",
         padding: "22px 20px 60px"
       },
-      children: [Gl.length > 0 && E !== "fiche" && _jsxs("div", {
+      children: [newFileNotes.length > 0 && _jsxs("div", {
+        style: {
+          background: "linear-gradient(135deg, #E0F2F1, #E8F5E9)",
+          border: "1.5px solid #00897B",
+          borderRadius: 14,
+          padding: "14px 18px",
+          marginBottom: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          boxShadow: "0 3px 12px rgba(0,77,64,.08)",
+          flexWrap: "wrap"
+        },
+        children: [
+          _jsxs("div", {
+            style: { display: "flex", alignItems: "center", gap: 12 },
+            children: [
+              _jsx("span", { style: { fontSize: 24 }, children: "📁" }),
+              _jsxs("div", {
+                children: [
+                  _jsx("strong", { style: { color: "#004D40", fontSize: 14 }, children: `🔔 ${newFileNotes.length} nouveau(x) document(s) client(s) reçu(s) !` }),
+                  _jsx("div", { style: { color: "#00695C", fontSize: 12, marginTop: 2 }, children: newFileNotes[0].full.replace("📁 NOUVEAU FICHIER CLIENT — ", "") })
+                ]
+              })
+            ]
+          }),
+          _jsx("button", {
+            onClick: () => {
+              let noteItem = newFileNotes[0];
+              let matchedClient = w.find(p => noteItem.patient_id ? p.id === noteItem.patient_id : (p.email && noteItem.full.toLowerCase().includes(p.email.toLowerCase())) || (p.nom && noteItem.full.toLowerCase().includes(p.nom.toLowerCase())));
+              if (matchedClient) {
+                Mr(matchedClient);
+              } else {
+                g("activite");
+              }
+            },
+            style: {
+              background: "#00695C",
+              color: "#fff",
+              border: "none",
+              padding: "9px 16px",
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 12,
+              cursor: "pointer",
+              whiteSpace: "nowrap"
+            },
+            children: "👁️ Voir le document client"
+          })
+        ]
+      }), Gl.length > 0 && E !== "fiche" && _jsxs("div", {
         style: {
           background: "linear-gradient(135deg,#FFF8E1,#FFF3E0)",
           border: "1px solid #FFB300",
