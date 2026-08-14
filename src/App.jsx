@@ -12992,7 +12992,7 @@ function Rg({
           created_at: y.created_at
         });
       }), B(Object.values(c).filter(y => y.email && y.email.trim() !== "").sort((y, b) => (y.nom || "").localeCompare(b.nom || ""))), Y([...ue.blocked]);
-    } else Promise.all([X.get("appointments", "status=neq.archived&order=rdv_date.asc", j), X.get("profiles", "order=created_at.desc", j), X.get("blocked_slots", "order=blocked_date.asc", j)]).then(([c, y, b]) => {
+    } else Promise.all([X.get("appointments", "status=neq.archived&order=rdv_date.asc", j), X.get("profiles", "select=id,email,prenom,nom,tel,dob,created_at,has_account,guests&order=created_at.desc", j), X.get("blocked_slots", "order=blocked_date.asc", j)]).then(([c, y, b]) => {
       if (Array.isArray(c)) {
         R(c);
         try {
