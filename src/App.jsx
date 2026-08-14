@@ -13084,22 +13084,26 @@ function Rg({
             b = c.id && !c.id.includes("@") && c.id.length > 20,
             _ = y ? `patient_email=eq.${encodeURIComponent(c.email)}&status=neq.archived&order=rdv_date.desc` : `patient_id=eq.${c.id}&status=neq.archived&order=rdv_date.desc`,
             G = b ? `patient_id=eq.${c.id}&order=created_at.desc` : `patient_id=eq.${c.id}&order=created_at.desc`,
-            H = b && y ? `or=(patient_id.eq.${c.id},patient_email.eq.${encodeURIComponent(c.email)})&order=created_at.desc` : y ? `patient_email=eq.${encodeURIComponent(c.email)}&order=created_at.desc` : `patient_id=eq.${c.id}&order=created_at.desc`;
-          b && X.get("profiles", `id=eq.${c.id}`, j).then(async F => {
+            H = b && y ? `or=(patient_id.eq.${c.id},patient_email.eq.${encodeURIComponent(c.email)})&order=created_at.desc` : y ? `patient_email=eq.${encodeURIComponent(c.email)}&order=created_at.desc` : `patient_id=eq.${c.id}&order=created_at.desc`,
+            profParam = b ? `id=eq.${c.id}` : y ? `email=eq.${encodeURIComponent(c.email)}` : null;
+          profParam && X.get("profiles", profParam, j).then(async F => {
             if (Array.isArray(F) && F[0]) {
-              let files = Array.isArray(F[0].client_files) ? F[0].client_files : [];
+              let targetProf = F[0];
+              let files = Array.isArray(targetProf.client_files) ? targetProf.client_files : [];
               let hasNew = files.some(f => f.uploaded_by === "client" && f.is_new_for_admin === true);
               if (hasNew) {
                 files = files.map(f => f.uploaded_by === "client" && f.is_new_for_admin === true ? { ...f, is_new_for_admin: false } : f);
-                await X.patch("profiles", c.id, { client_files: files }, j).catch(err => console.error("Error marking files read:", err));
-                B(prev => prev.map(p => p.id === c.id ? { ...p, client_files: files } : p));
+                await X.patch("profiles", targetProf.id, { client_files: files }, j).catch(err => console.error("Error marking files read:", err));
+                B(prev => prev.map(p => (p.id === targetProf.id || p.email === targetProf.email) ? { ...p, client_files: files } : p));
               }
               L(N => ({
                 ...N,
+                id: targetProf.id || N.id,
                 client_files: files,
-                client_docs: Array.isArray(F[0].client_docs) ? F[0].client_docs : [],
-                all_supplements: Array.isArray(F[0].all_supplements) ? F[0].all_supplements : [],
-                guests: Array.isArray(F[0].guests) ? F[0].guests : []
+                client_docs: Array.isArray(targetProf.client_docs) ? targetProf.client_docs : [],
+                all_supplements: Array.isArray(targetProf.all_supplements) ? targetProf.all_supplements : [],
+                guests: Array.isArray(targetProf.guests) ? targetProf.guests : [],
+                has_account: true
               }));
             }
           }).catch(() => {}), Promise.all([X.get("appointments", _, j), X.get("admin_notes", G, j), X.get("questionnaires", H, j)]).then(([F, N, K]) => {
