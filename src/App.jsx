@@ -10325,8 +10325,23 @@ function Tg({
     [R, k] = useState(""),
     [Q, f] = useState(""),
     [m, d] = useState(!1);
-  let adminFiles = (e.client_files || []).filter(C => C.uploaded_by !== "client");
-  let clientFiles = (e.client_files || []).filter(C => C.uploaded_by === "client");
+  let extraNoteFiles = [];
+  try {
+    if (Array.isArray(yl)) {
+      yl.forEach(n => {
+        if (n.patient_id === e.id && n.full && (n.full.includes("📁 FICHIER CLIENT — ") || n.full.includes("📁 FICHIER ADMIN — "))) {
+          try {
+            let jsonPart = n.full.split(" — ")[1];
+            let fileObj = JSON.parse(jsonPart);
+            extraNoteFiles.push({ ...fileObj, _note_id: n.id });
+          } catch(err) {}
+        }
+      });
+    }
+  } catch(e) {}
+  let combinedFiles = [...(e.client_files || []), ...extraNoteFiles];
+  let adminFiles = combinedFiles.filter(C => C.uploaded_by !== "client");
+  let clientFiles = combinedFiles.filter(C => C.uploaded_by === "client");
   useEffect(() => {
     (async () => {
       s(!0);
@@ -11456,14 +11471,13 @@ function Tg({
                 const finalFiles = [...currentFiles, ...newFilesList];
 
                 if (!ee) {
-                  let patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, e.token).catch(() => null);
-                  if (!patchRes || patchRes.error || patchRes.code) {
-                    patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, j).catch(() => null);
-                  }
-                  if (patchRes && (patchRes.error || patchRes.code)) {
-                    console.error("Supabase client patch failed:", patchRes);
-                    alert("Erreur lors de la sauvegarde du fichier.");
-                    return;
+                  for (let fileObj of newFilesList) {
+                    const noteText = `📁 FICHIER CLIENT — ${JSON.stringify(fileObj)}`;
+                    await X.post("admin_notes", {
+                      patient_id: e.id,
+                      note: noteText,
+                      created_at: new Date().toISOString()
+                    }, j).catch(err => console.error("Post file note error:", err));
                   }
                   const clientFullName = `${e.prenom || ''} ${e.nom || ''}`.trim() || e.email;
                   const uploadedNames = newFilesList.map(f => f.name).join(", ");
@@ -16691,13 +16705,13 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                 const finalFiles = [...currentFiles, ...newFilesList];
 
                 if (!ee) {
-                  const patchRes = await X.patch("profiles", O.id, {
-                    client_files: finalFiles
-                  }, j);
-                  if (patchRes && (patchRes.error || patchRes.code)) {
-                    console.error("Supabase patch failed:", patchRes);
-                    alert("Erreur lors de la sauvegarde du fichier dans la base de données.");
-                    return;
+                  for (let fileObj of newFilesList) {
+                    const noteText = `📁 FICHIER ADMIN — ${JSON.stringify(fileObj)}`;
+                    await X.post("admin_notes", {
+                      patient_id: O.id,
+                      note: noteText,
+                      created_at: new Date().toISOString()
+                    }, j).catch(err => console.error("Post admin file note error:", err));
                   }
                   if (O.email && O.email !== "—" && O.email.includes("@")) {
                     const emailSubject = "📄 Nouveau document disponible — VITASCIENZELAB";
