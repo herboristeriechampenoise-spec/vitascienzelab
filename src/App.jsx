@@ -9116,20 +9116,38 @@ const X = {
   }).then(l => l.ok)
 };
 const downloadBase64File = (base64Data, filename) => {
-  if (!base64Data) return;
+  if (!base64Data) {
+    alert("Le fichier est vide ou indisponible.");
+    return;
+  }
   try {
-    if (!base64Data.startsWith("data:")) {
+    let cleanData = String(base64Data).trim();
+    if (!cleanData.startsWith("data:")) {
       const a = document.createElement("a");
-      a.href = base64Data;
-      a.download = filename;
+      a.href = cleanData;
+      a.download = filename || "document";
+      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       return;
     }
-    const parts = base64Data.split(";base64,");
-    const contentType = parts[0].split(":")[1] || "application/octet-stream";
-    const raw = window.atob(parts[1]);
+    const parts = cleanData.split(";base64,");
+    if (parts.length < 2) {
+      const a = document.createElement("a");
+      a.href = cleanData;
+      a.download = filename || "document";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+    const contentType = parts[0].replace("data:", "") || "application/octet-stream";
+    let rawBase64 = parts[1].replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
+    while (rawBase64.length % 4 !== 0) {
+      rawBase64 += "=";
+    }
+    const raw = window.atob(rawBase64);
     const rawLength = raw.length;
     const uInt8Array = new Uint8Array(rawLength);
     for (let i = 0; i < rawLength; ++i) {
@@ -9139,20 +9157,95 @@ const downloadBase64File = (base64Data, filename) => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
+    a.download = filename || "document";
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 2000);
   } catch (err) {
-    console.error("Failed to download file:", err);
-    const newWindow = window.open();
-    if (newWindow) {
-      newWindow.document.write(`<iframe src="${base64Data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-    } else {
-      window.location.href = base64Data;
+    console.error("Primary base64 download failed, attempting native fetch fallback:", err);
+    try {
+      fetch(base64Data)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename || "document";
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }, 2000);
+        })
+        .catch(() => {
+          const win = window.open();
+          if (win) {
+            win.document.write(`<iframe src="${base64Data}" frameborder="0" style="border:0; width:100%; height:100%;" allowfullscreen></iframe>`);
+          } else {
+            window.location.href = base64Data;
+          }
+        });
+    } catch (e) {
+      alert("Erreur lors du téléchargement du fichier.");
     }
   }
+};
+const compressAndReadFile = (file) => {
+  return new Promise((resolve, reject) => {
+    if (file.size > 15 * 1024 * 1024) {
+      reject(new Error(`Le fichier "${file.name}" dépasse la taille maximale autorisée (15 Mo).`));
+      return;
+    }
+    const isImage = file.type.startsWith("image/");
+    if (isImage) {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target.result;
+      };
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1600;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
+        resolve({
+          name: file.name.replace(/\.[^/.]+$/, ".jpg"),
+          type: "image/jpeg",
+          data: compressedDataUrl
+        });
+      };
+      img.onerror = () => {
+        const readerRaw = new FileReader();
+        readerRaw.onload = (ev) => resolve({ name: file.name, type: file.type, data: ev.target.result });
+        readerRaw.onerror = reject;
+        readerRaw.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve({ name: file.name, type: file.type, data: e.target.result });
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    }
+  });
 };
 function Ag() {
   return _jsx("div", {
@@ -11347,58 +11440,51 @@ function Tg({
               display: "none"
             },
             onChange: async c => {
-              const files = Array.from(c.target.files);
-              if (files.length === 0) return;
-              let loadedCount = 0;
-              let newFilesList = [];
-              let currentFiles = e.client_files || [];
-              files.forEach(b => {
-                let reader = new FileReader();
-                reader.onload = async G => {
-                  let fileObj = {
-                    name: b.name,
-                    type: b.type,
-                    data: G.target.result,
-                    date: new Date().toLocaleDateString("fr-FR"),
-                    uploaded_by: "client",
-                    is_new_for_admin: true
-                  };
-                  newFilesList.push(fileObj);
-                  loadedCount++;
-                  if (loadedCount === files.length) {
-                    const finalFiles = [...currentFiles, ...newFilesList];
-                    try {
-                      if (!ee) {
-                        const patchRes = await X.patch("profiles", e.id, {
-                          client_files: finalFiles
-                        }, e.token);
-                        if (patchRes && (patchRes.error || patchRes.code)) {
-                          console.error("Supabase client patch failed:", patchRes);
-                          alert("Erreur lors de la sauvegarde du fichier.");
-                          return;
-                        }
-                        const clientFullName = `${e.prenom || ''} ${e.nom || ''}`.trim() || e.email;
-                        const uploadedNames = newFilesList.map(f => f.name).join(", ");
-                        X.post("admin_notes", {
-                          patient_id: e.id,
-                          note: `📁 NOUVEAU FICHIER CLIENT — ${clientFullName} a déposé le(s) fichier(s) : ${uploadedNames}`,
-                          created_at: new Date().toISOString()
-                        }, j).catch(() => {});
-                      }
-                      t({
-                        ...e,
-                        client_files: finalFiles
-                      });
-                    } catch (err) {
-                      console.error("Client upload error:", err);
-                      alert("Une erreur est survenue lors de l'enregistrement.");
-                      return;
-                    }
+              const selectedFiles = Array.from(c.target.files);
+              if (selectedFiles.length === 0) return;
+              try {
+                const processedFiles = await Promise.all(selectedFiles.map(file => compressAndReadFile(file)));
+                const newFilesList = processedFiles.map(f => ({
+                  name: f.name,
+                  type: f.type,
+                  data: f.data,
+                  date: new Date().toLocaleDateString("fr-FR"),
+                  uploaded_by: "client",
+                  is_new_for_admin: true
+                }));
+                const currentFiles = e.client_files || [];
+                const finalFiles = [...currentFiles, ...newFilesList];
+
+                if (!ee) {
+                  let patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, e.token).catch(() => null);
+                  if (!patchRes || patchRes.error || patchRes.code) {
+                    patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, j).catch(() => null);
                   }
-                };
-                reader.readAsDataURL(b);
-              });
-              c.target.value = "";
+                  if (patchRes && (patchRes.error || patchRes.code)) {
+                    console.error("Supabase client patch failed:", patchRes);
+                    alert("Erreur lors de la sauvegarde du fichier.");
+                    return;
+                  }
+                  const clientFullName = `${e.prenom || ''} ${e.nom || ''}`.trim() || e.email;
+                  const uploadedNames = newFilesList.map(f => f.name).join(", ");
+                  X.post("admin_notes", {
+                    patient_id: e.id,
+                    note: `📁 NOUVEAU FICHIER CLIENT — ${clientFullName} a déposé le(s) fichier(s) : ${uploadedNames}`,
+                    created_at: new Date().toISOString()
+                  }, j).catch(() => {});
+                }
+
+                t({
+                  ...e,
+                  client_files: finalFiles
+                });
+                alert(`✅ ${newFilesList.length} fichier(s) déposé(s) avec succès !`);
+              } catch (err) {
+                console.error("Client upload error:", err);
+                alert(err.message || "Une erreur est survenue lors de l'enregistrement.");
+              } finally {
+                c.target.value = "";
+              }
             }
           }),
           _jsx("button", {
@@ -16590,74 +16676,65 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             style: {
               display: "none"
             },
-            onChange: c => {
-              const files = Array.from(c.target.files);
-              if (files.length === 0) return;
-              let loadedCount = 0;
-              let newFilesList = [];
-              let currentFiles = O.client_files || [];
-              files.forEach(b => {
-                let reader = new FileReader();
-                reader.onload = async G => {
-                  let fileObj = {
-                    name: b.name,
-                    type: b.type,
-                    data: G.target.result,
-                    date: new Date().toLocaleDateString("fr-FR")
-                  };
-                  newFilesList.push(fileObj);
-                  loadedCount++;
-                  if (loadedCount === files.length) {
-                    const finalFiles = [...currentFiles, ...newFilesList];
-                    if (!ee) {
-                      try {
-                        const patchRes = await X.patch("profiles", O.id, {
-                          client_files: finalFiles
-                        }, j);
-                        if (patchRes && (patchRes.error || patchRes.code)) {
-                          console.error("Supabase patch failed:", patchRes);
-                          alert("Erreur lors de la sauvegarde du fichier dans la base de données.");
-                          return;
-                        }
-                        if (O.email && O.email !== "—" && O.email.includes("@")) {
-                          const emailSubject = "📄 Nouveau document disponible — VITASCIENZELAB";
-                          const emailHtml = `<div style="font-family:sans-serif;padding:20px;max-width:500px">
-                            <h2 style="color:#1565C0">Nouveau document disponible</h2>
-                            <p>Bonjour ${O.prenom || ""},</p>
-                            <p>Un ou plusieurs nouveaux documents ont été ajoutés à votre dossier sur votre espace client :</p>
-                            <blockquote style="background:#F5F5F5;padding:12px;border-left:4px solid #1565C0;margin:16px 0;border-radius:4px;">
-                              <strong>${files.length > 1 ? "Fichiers ajoutés :" : "Fichier ajouté :"}</strong><br/>
-                              ${newFilesList.map(f => `• ${f.name}`).join("<br/>")}
-                            </blockquote>
-                            <p>Vous pouvez vous connecter à votre compte pour les consulter et les télécharger :</p>
-                            <div style="margin:20px 0;">
-                              <a href="https://vitascienzelab.vercel.app" style="background:#1565C0;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;font-weight:bold;display:inline-block;">Accéder à mon espace client</a>
-                            </div>
-                            <p style="color:#546E7A;font-size:12px">Si vous n'avez pas encore créé de compte, vous pouvez le faire en utilisant cette même adresse e-mail (${O.email}) pour y retrouver automatiquement vos documents.</p>
-                            <hr style="border:none;border-top:1px solid #ECEFF1;margin:20px 0;"/>
-                            <p style="color:#90A4AE;font-size:11px">VITASCIENZELAB &middot; Herboristerie Champenoise</p>
-                          </div>`;
-                          await jn(O.email, emailSubject, emailHtml);
-                        }
-                      } catch (err) {
-                        console.error("File upload patch/email error:", err);
-                        alert("Une erreur est survenue lors de l'enregistrement ou de la notification.");
-                        return;
-                      }
-                    }
-                    L(N => ({
-                      ...N,
-                      client_files: finalFiles
-                    }));
-                    setPatients(N => N.map(K => K.id === O.id ? {
-                      ...K,
-                      client_files: finalFiles
-                    } : K));
+            onChange: async c => {
+              const selectedFiles = Array.from(c.target.files);
+              if (selectedFiles.length === 0) return;
+              try {
+                const processedFiles = await Promise.all(selectedFiles.map(file => compressAndReadFile(file)));
+                const newFilesList = processedFiles.map(f => ({
+                  name: f.name,
+                  type: f.type,
+                  data: f.data,
+                  date: new Date().toLocaleDateString("fr-FR")
+                }));
+                const currentFiles = O.client_files || [];
+                const finalFiles = [...currentFiles, ...newFilesList];
+
+                if (!ee) {
+                  const patchRes = await X.patch("profiles", O.id, {
+                    client_files: finalFiles
+                  }, j);
+                  if (patchRes && (patchRes.error || patchRes.code)) {
+                    console.error("Supabase patch failed:", patchRes);
+                    alert("Erreur lors de la sauvegarde du fichier dans la base de données.");
+                    return;
                   }
-                };
-                reader.readAsDataURL(b);
-              });
-              c.target.value = "";
+                  if (O.email && O.email !== "—" && O.email.includes("@")) {
+                    const emailSubject = "📄 Nouveau document disponible — VITASCIENZELAB";
+                    const emailHtml = `<div style="font-family:sans-serif;padding:20px;max-width:500px">
+                      <h2 style="color:#1565C0">Nouveau document disponible</h2>
+                      <p>Bonjour ${O.prenom || ""},</p>
+                      <p>Un ou plusieurs nouveaux documents ont été ajoutés à votre dossier sur votre espace client :</p>
+                      <blockquote style="background:#F5F5F5;padding:12px;border-left:4px solid #1565C0;margin:16px 0;border-radius:4px;">
+                        <strong>${selectedFiles.length > 1 ? "Fichiers ajoutés :" : "Fichier ajouté :"}</strong><br/>
+                        ${newFilesList.map(f => `• ${f.name}`).join("<br/>")}
+                      </blockquote>
+                      <p>Vous pouvez vous connecter à votre compte pour les consulter et les télécharger :</p>
+                      <div style="margin:20px 0;">
+                        <a href="https://vitascienzelab.vercel.app" style="background:#1565C0;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;font-weight:bold;display:inline-block;">Accéder à mon espace client</a>
+                      </div>
+                      <p style="color:#546E7A;font-size:12px">Si vous n'avez pas encore créé de compte, vous pouvez le faire en utilisant cette même adresse e-mail (${O.email}) pour y retrouver automatiquement vos documents.</p>
+                      <hr style="border:none;border-top:1px solid #ECEFF1;margin:20px 0;"/>
+                      <p style="color:#90A4AE;font-size:11px">VITASCIENZELAB &middot; Herboristerie Champenoise</p>
+                    </div>`;
+                    await jn(O.email, emailSubject, emailHtml).catch(() => {});
+                  }
+                }
+                L(N => ({
+                  ...N,
+                  client_files: finalFiles
+                }));
+                setPatients(N => N.map(K => K.id === O.id ? {
+                  ...K,
+                  client_files: finalFiles
+                } : K));
+                alert(`✅ ${newFilesList.length} fichier(s) déposé(s) avec succès !`);
+              } catch (err) {
+                console.error("Admin upload error:", err);
+                alert(err.message || "Une erreur est survenue lors de l'enregistrement.");
+              } finally {
+                c.target.value = "";
+              }
             }
           }), O.has_account ? _jsx("button", {
             onClick: () => document.getElementById("clientFileInput").click(),
