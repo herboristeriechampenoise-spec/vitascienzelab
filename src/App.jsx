@@ -10325,21 +10325,28 @@ function Tg({
     [R, k] = useState(""),
     [Q, f] = useState(""),
     [m, d] = useState(!1);
-  let extraNoteFiles = [];
-  try {
-    if (Array.isArray(yl)) {
-      yl.forEach(n => {
-        if (n.patient_id === e.id && n.full && (n.full.includes("📁 FICHIER CLIENT — ") || n.full.includes("📁 FICHIER ADMIN — "))) {
-          try {
-            let jsonPart = n.full.split(" — ")[1];
-            let fileObj = JSON.parse(jsonPart);
-            extraNoteFiles.push({ ...fileObj, _note_id: n.id });
-          } catch(err) {}
+  let [clientNoteFiles, setClientNoteFiles] = useState([]);
+  useEffect(() => {
+    if (e?.id && !ee) {
+      X.get("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`, j).then(notes => {
+        if (Array.isArray(notes)) {
+          let extracted = [];
+          notes.forEach(n => {
+            if (n.note && (n.note.includes("📁 FICHIER CLIENT — ") || n.note.includes("📁 FICHIER ADMIN — "))) {
+              try {
+                let jsonPart = n.note.split(" — ")[1];
+                let fileObj = JSON.parse(jsonPart);
+                extracted.push({ ...fileObj, _note_id: n.id });
+              } catch(err) {}
+            }
+          });
+          setClientNoteFiles(extracted);
         }
-      });
+      }).catch(() => {});
     }
-  } catch(e) {}
-  let combinedFiles = [...(e.client_files || []), ...extraNoteFiles];
+  }, [e?.id]);
+
+  let combinedFiles = [...(e.client_files || []), ...clientNoteFiles];
   let adminFiles = combinedFiles.filter(C => C.uploaded_by !== "client");
   let clientFiles = combinedFiles.filter(C => C.uploaded_by === "client");
   useEffect(() => {
@@ -16596,11 +16603,11 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             children: "Le client peut t\xE9l\xE9charger ces fichiers depuis son espace, mais ne peut pas les supprimer."
           }), (() => {
             let drawerNoteFiles = [];
-            if (Array.isArray(yl)) {
-              yl.forEach(n => {
-                if (n.patient_id === O.id && n.full && (n.full.includes("📁 FICHIER CLIENT — ") || n.full.includes("📁 FICHIER ADMIN — "))) {
+            if (Array.isArray(Oe)) {
+              Oe.forEach(n => {
+                if (n.note && (n.note.includes("📁 FICHIER CLIENT — ") || n.note.includes("📁 FICHIER ADMIN — "))) {
                   try {
-                    let jsonPart = n.full.split(" — ")[1];
+                    let jsonPart = n.note.split(" — ")[1];
                     let fileObj = JSON.parse(jsonPart);
                     drawerNoteFiles.push({ ...fileObj, _note_id: n.id });
                   } catch(err) {}
