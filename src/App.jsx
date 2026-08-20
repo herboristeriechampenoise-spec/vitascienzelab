@@ -11471,6 +11471,16 @@ function Tg({
                 const finalFiles = [...currentFiles, ...newFilesList];
 
                 if (!ee) {
+                  let patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, e.token).catch(() => null);
+                  if (!patchRes || patchRes.error || patchRes.code) {
+                    patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, j).catch(() => null);
+                  }
+                  if (patchRes && (patchRes.error || patchRes.code)) {
+                    console.error("Supabase client patch failed:", patchRes);
+                    alert("Erreur lors de la sauvegarde du fichier.");
+                    return;
+                  }
+
                   for (let fileObj of newFilesList) {
                     const noteText = `📁 FICHIER CLIENT — ${JSON.stringify(fileObj)}`;
                     await X.post("admin_notes", {
