@@ -16665,7 +16665,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   }, j)), L(_ => ({
                     ..._,
                     client_files: b
-                  })), setPatients(_ => _.map(G => G.id === O.id ? {
+                  })), B(_ => _.map(G => G.id === O.id ? {
                     ...G,
                     client_files: b
                   } : G));
@@ -16738,7 +16738,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   ...N,
                   client_files: finalFiles
                 }));
-                setPatients(N => N.map(K => K.id === O.id ? {
+                B(N => N.map(K => K.id === O.id ? {
                   ...K,
                   client_files: finalFiles
                 } : K));
