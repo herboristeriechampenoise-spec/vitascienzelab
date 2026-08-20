@@ -16247,7 +16247,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                 })
               })]
             }, y);
-          }), ")}"]
+          })]
         }), (() => {
           let c = `${O.prenom || ""} ${O.nom || ""}`.trim();
           return [{
@@ -16584,105 +16584,127 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               marginBottom: 12
             },
             children: "Le client peut t\xE9l\xE9charger ces fichiers depuis son espace, mais ne peut pas les supprimer."
-          }), (O.client_files || []).length === 0 ? _jsx("p", {
-            style: {
-              fontSize: 12,
-              color: "#B0BEC5",
-              textAlign: "center",
-              padding: "8px 0"
-            },
-            children: "Aucun fichier d\xE9pos\xE9."
-          }) : (O.client_files || []).map((c, y) => {
-            const isFromClient = c.uploaded_by === "client";
-            return _jsxs("div", {
+          }), (() => {
+            let drawerNoteFiles = [];
+            if (Array.isArray(yl)) {
+              yl.forEach(n => {
+                if (n.patient_id === O.id && n.full && (n.full.includes("📁 FICHIER CLIENT — ") || n.full.includes("📁 FICHIER ADMIN — "))) {
+                  try {
+                    let jsonPart = n.full.split(" — ")[1];
+                    let fileObj = JSON.parse(jsonPart);
+                    drawerNoteFiles.push({ ...fileObj, _note_id: n.id });
+                  } catch(err) {}
+                }
+              });
+            }
+            let allDrawerFiles = [...(O.client_files || []), ...drawerNoteFiles];
+            return allDrawerFiles.length === 0 ? _jsx("p", {
               style: {
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                background: isFromClient ? "#E0F2F1" : "#F3E5F5",
-                borderRadius: 8,
-                padding: "8px 12px",
-                marginBottom: 6
+                fontSize: 12,
+                color: "#B0BEC5",
+                textAlign: "center",
+                padding: "8px 0"
               },
-              children: [_jsx("span", {
+              children: "Aucun fichier d\xE9pos\xE9."
+            }) : allDrawerFiles.map((c, y) => {
+              const isFromClient = c.uploaded_by === "client";
+              return _jsxs("div", {
                 style: {
-                  fontSize: 18
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  background: isFromClient ? "#E0F2F1" : "#F3E5F5",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  marginBottom: 6
                 },
-                children: c.type?.includes("pdf") ? "📕" : c.type?.includes("image") ? "🖼️" : "📄"
-              }), _jsxs("div", {
-                style: {
-                  flex: 1
-                },
-                children: [_jsxs("div", {
+                children: [_jsx("span", {
                   style: {
-                    fontSize: 12,
+                    fontSize: 18
+                  },
+                  children: c.type?.includes("pdf") ? "📕" : c.type?.includes("image") ? "🖼️" : "📄"
+                }), _jsxs("div", {
+                  style: {
+                    flex: 1
+                  },
+                  children: [_jsxs("div", {
+                    style: {
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: isFromClient ? "#00695C" : "#6A1B9A",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6
+                    },
+                    children: [
+                      c.name,
+                      _jsx("span", {
+                        style: {
+                          fontSize: 9,
+                          background: isFromClient ? "#004D40" : "#4A148C",
+                          color: "#fff",
+                          padding: "1px 5px",
+                          borderRadius: 4,
+                          fontWeight: 700
+                        },
+                        children: isFromClient ? "Client" : "VitaScienzeLab"
+                      })
+                    ]
+                  }), _jsx("div", {
+                    style: {
+                      fontSize: 10,
+                      color: isFromClient ? "#80CBC4" : "#90A4AE"
+                    },
+                    children: c.date
+                  })]
+                }), c.data && _jsx("button", {
+                  onClick: () => downloadBase64File(c.data, c.name),
+                  style: {
+                    background: isFromClient ? "#00695C" : "#6A1B9A",
+                    color: "#fff",
+                    borderRadius: 7,
+                    padding: "4px 10px",
+                    fontSize: 11,
                     fontWeight: 600,
-                    color: isFromClient ? "#00695C" : "#6A1B9A",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6
+                    border: "none",
+                    cursor: "pointer"
                   },
-                  children: [
-                    c.name,
-                    _jsx("span", {
-                      style: {
-                        fontSize: 9,
-                        background: isFromClient ? "#004D40" : "#4A148C",
-                        color: "#fff",
-                        padding: "1px 5px",
-                        borderRadius: 4,
-                        fontWeight: 700
-                      },
-                      children: isFromClient ? "Client" : "VitaScienzeLab"
-                    })
-                  ]
-                }), _jsx("div", {
+                  children: "⬇️"
+                }), _jsx("button", {
+                  onClick: async () => {
+                    if (!window.confirm(`Supprimer "${c.name}" du dossier ?`)) return;
+                    try {
+                      if (c._note_id) {
+                        await fetch(`${Ge}/rest/v1/admin_notes?id=eq.${c._note_id}`, {
+                          method: "DELETE",
+                          headers: { apikey: j, Authorization: `Bearer ${j}` }
+                        });
+                        yl = yl.filter(n => n.id !== c._note_id);
+                        Yl(yl);
+                      } else {
+                        let b = (O.client_files || []).filter((_, G) => G !== y);
+                        ee || (await X.patch("profiles", O.id, { client_files: b }, j));
+                        L(_ => ({ ..._, client_files: b }));
+                        B(_ => _.map(G => G.id === O.id ? { ...G, client_files: b } : G));
+                      }
+                    } catch (err) {
+                      console.error("Delete file error:", err);
+                    }
+                  },
                   style: {
-                    fontSize: 10,
-                    color: isFromClient ? "#80CBC4" : "#90A4AE"
+                    background: "#FCE4EC",
+                    border: "none",
+                    color: "#C62828",
+                    borderRadius: 7,
+                    padding: "4px 8px",
+                    fontSize: 12,
+                    cursor: "pointer"
                   },
-                  children: c.date
+                  children: "🗑️"
                 })]
-              }), c.data && _jsx("button", {
-                onClick: () => downloadBase64File(c.data, c.name),
-                style: {
-                  background: isFromClient ? "#00695C" : "#6A1B9A",
-                  color: "#fff",
-                  borderRadius: 7,
-                  padding: "4px 10px",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer"
-                },
-                children: "⬇️"
-              }), _jsx("button", {
-                onClick: async () => {
-                  if (!window.confirm(`Supprimer "${c.name}" du dossier ?`)) return;
-                  let b = (O.client_files || []).filter((_, G) => G !== y);
-                  ee || (await X.patch("profiles", O.id, {
-                    client_files: b
-                  }, j)), L(_ => ({
-                    ..._,
-                    client_files: b
-                  })), B(_ => _.map(G => G.id === O.id ? {
-                    ...G,
-                    client_files: b
-                  } : G));
-                },
-                style: {
-                  background: "#FCE4EC",
-                  border: "none",
-                  color: "#C62828",
-                  borderRadius: 7,
-                  padding: "4px 8px",
-                  fontSize: 12,
-                  cursor: "pointer"
-                },
-                children: "🗑️"
-              })]
-            }, y);
-          }), _jsx("input", {
+              }, y);
+            });
+          })(), _jsx("input", {
             type: "file",
             id: "clientFileInput",
             multiple: !0,
@@ -16818,7 +16840,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               padding: "8px 16px"
             },
             children: "+ Ajouter"
-          }), Oe.map(c => _jsxs("div", {
+          }), Oe.filter(c => c.note && !c.note.includes("📁 FICHIER CLIENT — ") && !c.note.includes("📁 FICHIER ADMIN — ") && !c.note.includes("📁 NOUVEAU FICHIER CLIENT")).map(c => _jsxs("div", {
             style: {
               background: "#FFF8E1",
               borderRadius: 10,
