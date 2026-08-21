@@ -16757,12 +16757,11 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                         });
                         Ce(prev => (Array.isArray(prev) ? prev.filter(n => n.id !== c._note_id) : []));
                       }
-                      let b = (O.client_files || []).filter(f => !(f.name === c.name && (f.date === c.date || f.data === c.data)));
-                      if (b.length !== (O.client_files || []).length) {
-                        ee || (await X.patch("profiles", O.id, { client_files: b }, j));
-                        L(_ => ({ ..._, client_files: b }));
-                        B(_ => _.map(G => G.id === O.id ? { ...G, client_files: b } : G));
-                      }
+                      // Always remove by name from profiles.client_files (name is the unique key)
+                      let b = (O.client_files || []).filter(f => f.name !== c.name);
+                      if (!ee) await X.patch("profiles", O.id, { client_files: b }, j);
+                      L(_ => ({ ..._, client_files: b }));
+                      B(_ => _.map(G => G.id === O.id ? { ...G, client_files: b } : G));
                     } catch (err) {
                       console.error("Delete file error:", err);
                       alert("Erreur lors de la suppression.");
@@ -16805,6 +16804,8 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                 const finalFiles = [...currentFiles, ...newFilesList];
 
                 if (!ee) {
+                  // Save files permanently into profiles.client_files so clients can read them (admin_notes is blocked by RLS for clients)
+                  await X.patch("profiles", O.id, { client_files: finalFiles }, j).catch(err => console.error("Profile patch error:", err));
                   for (let fileObj of newFilesList) {
                     const noteText = `📁 FICHIER ADMIN — ${JSON.stringify(fileObj)}`;
                     await X.post("admin_notes", {
