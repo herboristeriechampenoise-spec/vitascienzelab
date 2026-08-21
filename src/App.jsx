@@ -10336,13 +10336,16 @@ function Tg({
         if (Array.isArray(notes)) {
           let extracted = [];
           notes.forEach(n => {
-            if (n.note && (n.note.includes("📁 FICHIER CLIENT — ") || n.note.includes("📁 FICHIER ADMIN — "))) {
+            if (n.note && n.note.includes("FICHIER")) {
               try {
-                let isFromAdmin = n.note.includes("📁 FICHIER ADMIN — ");
-                let jsonPart = n.note.split(" — ")[1];
-                let fileObj = JSON.parse(jsonPart);
-                if (isFromAdmin && !fileObj.uploaded_by) fileObj.uploaded_by = "admin";
-                extracted.push({ ...fileObj, _note_id: n.id });
+                let isFromAdmin = n.note.includes("FICHIER ADMIN");
+                let sIdx = n.note.indexOf("{");
+                let eIdx = n.note.lastIndexOf("}");
+                if (sIdx !== -1 && eIdx !== -1) {
+                  let fileObj = JSON.parse(n.note.substring(sIdx, eIdx + 1));
+                  fileObj.uploaded_by = isFromAdmin ? "admin" : "client";
+                  extracted.push({ ...fileObj, _note_id: n.id });
+                }
               } catch(err) {}
             }
           });
@@ -10357,14 +10360,15 @@ function Tg({
   let combinedFiles = [];
   let seenFileKeys = new Set();
   rawCombined.forEach(f => {
-    let key = `${f.name}_${f.date || ""}`;
+    if (!f || !f.name) return;
+    let key = `${f.name.trim().toLowerCase()}_${f.date || ""}`;
     if (!seenFileKeys.has(key)) {
       seenFileKeys.add(key);
       combinedFiles.push(f);
     }
   });
 
-  let adminFiles = combinedFiles.filter(C => C.uploaded_by !== "client");
+  let adminFiles = combinedFiles.filter(C => C.uploaded_by === "admin");
   let clientFiles = combinedFiles.filter(C => C.uploaded_by === "client");
   useEffect(() => {
     (async () => {
