@@ -10364,8 +10364,8 @@ function Tg({
     }
   });
 
-  let adminFiles = combinedFiles.filter(C => C.uploaded_by === "admin");
-  let clientFiles = combinedFiles.filter(C => C.uploaded_by !== "admin");
+  let adminFiles = combinedFiles.filter(C => C.uploaded_by !== "client");
+  let clientFiles = combinedFiles.filter(C => C.uploaded_by === "client");
   useEffect(() => {
     (async () => {
       s(!0);
