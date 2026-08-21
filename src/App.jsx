@@ -10326,16 +10326,22 @@ function Tg({
     [Q, f] = useState(""),
     [m, d] = useState(!1);
   let [clientNoteFiles, setClientNoteFiles] = useState([]);
+  let [freshProfileFiles, setFreshProfileFiles] = useState(null);
   useEffect(() => {
     if (e?.id && !ee) {
+      X.get("profiles", `id=eq.${e.id}&select=client_files`, j).then(res => {
+        if (Array.isArray(res) && res[0]?.client_files) setFreshProfileFiles(res[0].client_files);
+      }).catch(() => {});
       X.get("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`, j).then(notes => {
         if (Array.isArray(notes)) {
           let extracted = [];
           notes.forEach(n => {
             if (n.note && (n.note.includes("📁 FICHIER CLIENT — ") || n.note.includes("📁 FICHIER ADMIN — "))) {
               try {
+                let isFromAdmin = n.note.includes("📁 FICHIER ADMIN — ");
                 let jsonPart = n.note.split(" — ")[1];
                 let fileObj = JSON.parse(jsonPart);
+                if (isFromAdmin && !fileObj.uploaded_by) fileObj.uploaded_by = "admin";
                 extracted.push({ ...fileObj, _note_id: n.id });
               } catch(err) {}
             }
@@ -10346,9 +10352,23 @@ function Tg({
     }
   }, [e?.id]);
 
-  let combinedFiles = [...(e.client_files || []), ...clientNoteFiles];
-  let adminFiles = combinedFiles.filter(C => C.uploaded_by !== "client");
+  let activeProfileFiles = freshProfileFiles !== null ? freshProfileFiles : (e.client_files || []);
+  let rawCombined = [...activeProfileFiles, ...clientNoteFiles];
+  let combinedFiles = [];
+  let seenFileKeys = new Set();
+  rawCombined.forEach(f => {
+    let key = `${f.name}_${f.date || ""}`;
+    if (!seenFileKeys.has(key)) {
+      seenFileKeys.add(key);
+      combinedFiles.push(f);
+    }
+  });
+
+  let adminFiles = combinedFiles.filter(C => C.uploaded_by === "admin" || (C.uploaded_by !== "client" && C.uploaded_by !== undefined));
   let clientFiles = combinedFiles.filter(C => C.uploaded_by === "client");
+  if (adminFiles.length === 0 && combinedFiles.length > 0) {
+    adminFiles = combinedFiles;
+  }
   useEffect(() => {
     (async () => {
       s(!0);
@@ -16777,7 +16797,8 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   name: f.name,
                   type: f.type,
                   data: f.data,
-                  date: new Date().toLocaleDateString("fr-FR")
+                  date: new Date().toLocaleDateString("fr-FR"),
+                  uploaded_by: "admin"
                 }));
                 const currentFiles = O.client_files || [];
                 const finalFiles = [...currentFiles, ...newFilesList];
