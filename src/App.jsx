@@ -16696,16 +16696,17 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                           method: "DELETE",
                           headers: { apikey: j, Authorization: `Bearer ${j}` }
                         });
-                        yl = yl.filter(n => n.id !== c._note_id);
-                        Yl(yl);
-                      } else {
-                        let b = (O.client_files || []).filter((_, G) => G !== y);
+                        Ce(prev => (Array.isArray(prev) ? prev.filter(n => n.id !== c._note_id) : []));
+                      }
+                      let b = (O.client_files || []).filter(f => !(f.name === c.name && (f.date === c.date || f.data === c.data)));
+                      if (b.length !== (O.client_files || []).length) {
                         ee || (await X.patch("profiles", O.id, { client_files: b }, j));
                         L(_ => ({ ..._, client_files: b }));
                         B(_ => _.map(G => G.id === O.id ? { ...G, client_files: b } : G));
                       }
                     } catch (err) {
                       console.error("Delete file error:", err);
+                      alert("Erreur lors de la suppression.");
                     }
                   },
                   style: {
