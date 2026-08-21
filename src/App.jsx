@@ -16772,14 +16772,35 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                   onClick: async () => {
                     if (!window.confirm(`Supprimer "${c.name}" du dossier ?`)) return;
                     try {
-                      if (c._note_id) {
-                        await fetch(`${Ge}/rest/v1/admin_notes?id=eq.${c._note_id}`, {
+                      // Delete ALL admin_notes containing this file name for this patient
+                      // (covers both _note_id cases and files loaded from profiles.client_files)
+                      let notesToDelete = Array.isArray(Oe) ? Oe.filter(n => {
+                        if (!n.note || !n.note.includes("FICHIER")) return false;
+                        try {
+                          let sIdx = n.note.indexOf("{");
+                          let eIdx = n.note.lastIndexOf("}");
+                          if (sIdx === -1 || eIdx === -1) return false;
+                          let obj = JSON.parse(n.note.substring(sIdx, eIdx + 1));
+                          return obj.name === c.name;
+                        } catch(_) { return false; }
+                      }) : [];
+
+                      // Also check if there's a note_id directly on the file
+                      if (c._note_id && !notesToDelete.find(n => n.id === c._note_id)) {
+                        notesToDelete.push({ id: c._note_id });
+                      }
+
+                      for (let note of notesToDelete) {
+                        await fetch(`${Ge}/rest/v1/admin_notes?id=eq.${note.id}`, {
                           method: "DELETE",
                           headers: { apikey: j, Authorization: `Bearer ${j}` }
-                        });
-                        Ce(prev => (Array.isArray(prev) ? prev.filter(n => n.id !== c._note_id) : []));
+                        }).catch(() => {});
                       }
-                      // Always remove by name from profiles.client_files (name is the unique key)
+
+                      // Update Oe state to remove deleted notes
+                      Ce(prev => Array.isArray(prev) ? prev.filter(n => !notesToDelete.find(d => d.id === n.id)) : []);
+
+                      // Remove from profiles.client_files
                       let b = (O.client_files || []).filter(f => f.name !== c.name);
                       if (!ee) await X.patch("profiles", O.id, { client_files: b }, j);
                       L(_ => ({ ..._, client_files: b }));
