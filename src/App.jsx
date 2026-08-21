@@ -10357,8 +10357,18 @@ function Tg({
     }
   }, [e?.id]);
 
-  let activeProfileFiles = freshProfileFiles !== null ? freshProfileFiles : (e.client_files || []);
-  let rawCombined = [...activeProfileFiles, ...clientNoteFiles];
+  // Merge e.client_files (updated immediately by t() on upload) with freshProfileFiles (from DB on mount)
+  // This ensures new uploads appear instantly AND DB files are always loaded
+  let eMerged = e.client_files || [];
+  let dbMerged = freshProfileFiles || [];
+  let mergedProfileFiles = [...eMerged];
+  let mergedNames = new Set(eMerged.map(f => f.name?.trim().toLowerCase()));
+  dbMerged.forEach(f => {
+    let k = f.name?.trim().toLowerCase();
+    if (k && !mergedNames.has(k)) { mergedNames.add(k); mergedProfileFiles.push(f); }
+  });
+
+  let rawCombined = [...mergedProfileFiles, ...clientNoteFiles];
   let combinedFiles = [];
   let seenFileKeys = new Set();
   rawCombined.forEach(f => {
@@ -11447,7 +11457,7 @@ function Tg({
                   _jsx("button", {
                     onClick: async () => {
                       if (!window.confirm(`Supprimer "${C.name}" ?`)) return;
-                      const remainingFiles = (e.client_files || []).filter(f => f.name !== C.name || f.date !== C.date || f.data !== C.data);
+                      const remainingFiles = (e.client_files || []).filter(f => f.name !== C.name);
                       try {
                         if (!ee) {
                           await X.patch("profiles", e.id, {
@@ -11458,6 +11468,7 @@ function Tg({
                           ...e,
                           client_files: remainingFiles
                         });
+                        setFreshProfileFiles(remainingFiles);
                       } catch (err) {
                         console.error("Error deleting file:", err);
                       }
@@ -11533,6 +11544,7 @@ function Tg({
                   ...e,
                   client_files: finalFiles
                 });
+                setFreshProfileFiles(finalFiles);
                 alert(`✅ ${newFilesList.length} fichier(s) déposé(s) avec succès !`);
               } catch (err) {
                 console.error("Client upload error:", err);
@@ -16631,14 +16643,21 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               Oe.forEach(n => {
                 if (n.note && (n.note.includes("📁 FICHIER CLIENT — ") || n.note.includes("📁 FICHIER ADMIN — "))) {
                   try {
-                    let jsonPart = n.note.split(" — ")[1];
-                    let fileObj = JSON.parse(jsonPart);
-                    drawerNoteFiles.push({ ...fileObj, _note_id: n.id });
+                    let sIdx = n.note.indexOf("{");
+                    let eIdx = n.note.lastIndexOf("}");
+                    if (sIdx !== -1 && eIdx !== -1) {
+                      let fileObj = JSON.parse(n.note.substring(sIdx, eIdx + 1));
+                      drawerNoteFiles.push({ ...fileObj, _note_id: n.id });
+                    }
                   } catch(err) {}
                 }
               });
             }
-            let allDrawerFiles = [...(O.client_files || []), ...drawerNoteFiles];
+            // Merge: start from O.client_files (source of truth), add note files not already present by name
+            let profileFiles = O.client_files || [];
+            let profileNames = new Set(profileFiles.map(f => f.name?.trim().toLowerCase()));
+            let extraNoteFiles = drawerNoteFiles.filter(f => f.name && !profileNames.has(f.name.trim().toLowerCase()));
+            let allDrawerFiles = [...profileFiles, ...extraNoteFiles];
             return allDrawerFiles.length === 0 ? _jsx("p", {
               style: {
                 fontSize: 12,
