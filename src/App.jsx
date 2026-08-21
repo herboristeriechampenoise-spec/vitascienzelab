@@ -10329,10 +10329,12 @@ function Tg({
   let [freshProfileFiles, setFreshProfileFiles] = useState(null);
   useEffect(() => {
     if (e?.id && !ee) {
-      X.get("profiles", `id=eq.${e.id}&select=client_files`, j).then(res => {
+      // Use e.token (client's own session JWT) — anon key is blocked by RLS on profiles
+      const authToken = e.token || j;
+      X.get("profiles", `id=eq.${e.id}&select=client_files`, authToken).then(res => {
         if (Array.isArray(res) && res[0]?.client_files) setFreshProfileFiles(res[0].client_files);
       }).catch(() => {});
-      X.get("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`, j).then(notes => {
+      X.get("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`, authToken).then(notes => {
         if (Array.isArray(notes)) {
           let extracted = [];
           notes.forEach(n => {
@@ -10368,7 +10370,8 @@ function Tg({
     }
   });
 
-  let adminFiles = combinedFiles.filter(C => C.uploaded_by === "admin");
+  // adminFiles = everything NOT explicitly uploaded by a client (includes legacy files without uploaded_by)
+  let adminFiles = combinedFiles.filter(C => C.uploaded_by !== "client");
   let clientFiles = combinedFiles.filter(C => C.uploaded_by === "client");
   useEffect(() => {
     (async () => {
