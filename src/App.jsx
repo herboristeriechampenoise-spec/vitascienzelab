@@ -16673,8 +16673,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       color: isFromClient ? "#80CBC4" : "#90A4AE"
                     },
                     children: c.date
-                  })]
-                }), c.data && _jsx("button", {
+                  })
+                ]
+              }), c.data ? _jsx("button", {
                   onClick: () => downloadBase64File(c.data, c.name),
                   style: {
                     background: isFromClient ? "#00695C" : "#6A1B9A",
@@ -16687,6 +16688,43 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                     cursor: "pointer"
                   },
                   children: "⬇️"
+                }) : _jsx("label", {
+                  style: {
+                    background: "#FFF3E0",
+                    color: "#E65100",
+                    borderRadius: 7,
+                    padding: "3px 8px",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    border: "1px solid #FFE0B2",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4
+                  },
+                  children: [
+                    "📤 Joindre PDF",
+                    _jsx("input", {
+                      type: "file",
+                      accept: "application/pdf,image/*",
+                      style: { display: "none" },
+                      onChange: async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = async (evt) => {
+                          const b64Data = evt.target.result;
+                          const updatedDoc = { ...c, data: b64Data, date: new Date().toLocaleDateString("fr-FR") };
+                          let updatedList = (O.client_files || []).map(f => f.name === c.name ? updatedDoc : f);
+                          if (!updatedList.some(f => f.name === c.name)) updatedList.push(updatedDoc);
+                          await X.patch("profiles", O.id, { client_files: updatedList }, j);
+                          L(prev => ({ ...prev, client_files: updatedList }));
+                          B(prev => prev.map(p => p.id === O.id ? { ...p, client_files: updatedList } : p));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    })
+                  ]
                 }), _jsx("button", {
                   onClick: async () => {
                     if (!window.confirm(`Supprimer "${c.name}" du dossier ?`)) return;
