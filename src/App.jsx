@@ -13098,9 +13098,60 @@ function Rg({
       recurring: !1
     }),
     [dt, w0] = useState({}),
+    [prepClient, setPrepClient] = useState(""),
+    [prepDate, setPrepDate] = useState(""),
+    [prepSlot, setPrepSlot] = useState("17:00"),
+    [prepService, setPrepService] = useState("Séance de Conseil en Compléments"),
+    [prepStatus, setPrepStatus] = useState(""),
+    [prepLoading, setPrepLoading] = useState(!1),
     [F0, Tr] = useState(!1),
-    [Br, Rr] = useState(!1),
-    H0 = "VitaAdmin2024",
+    [Br, Rr] = useState(!1);
+
+  const handleSendPrepEmail = async () => {
+    if (!prepClient) {
+      setPrepStatus("⚠️ Veuillez sélectionner un client dans la liste.");
+      return;
+    }
+    if (!prepDate || !prepSlot) {
+      setPrepStatus("⚠️ Veuillez indiquer la date et l'horaire du rendez-vous.");
+      return;
+    }
+    const targetClient = w.find(c => c.id === prepClient || c.email === prepClient);
+    if (!targetClient || !targetClient.email) {
+      setPrepStatus("⚠️ Le client sélectionné n'a pas d'adresse email valide.");
+      return;
+    }
+
+    setPrepLoading(!0);
+    setPrepStatus("");
+
+    try {
+      const res = await fetch("/api/send-prep-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientName: `${targetClient.prenom || ''} ${targetClient.nom || ''}`.trim(),
+          clientEmail: targetClient.email,
+          patientId: targetClient.id,
+          rdvDate: prepDate,
+          slot: prepSlot,
+          serviceTitle: prepService
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPrepStatus(`✅ Mail de préparation envoyé avec succès à ${targetClient.prenom || ''} ${targetClient.nom || ''} (${targetClient.email}) pour le ${data.formattedDate || prepDate} à ${prepSlot} !`);
+      } else {
+        setPrepStatus("❌ Erreur lors de l'envoi : " + (data.error || "Échec"));
+      }
+    } catch(err) {
+      setPrepStatus("❌ Erreur serveur : " + err.message);
+    } finally {
+      setPrepLoading(!1);
+    }
+  };
+  const H0 = "VitaAdmin2024";
     Ru = async () => {
       if (ee) {
         l === H0 ? n(!0) : r(!0);
