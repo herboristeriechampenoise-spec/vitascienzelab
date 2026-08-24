@@ -17695,19 +17695,34 @@ function Mg({
   }, [e]);
   let S = async () => {
     if (Object.keys(a).length < 1) {
-      v("Merci de r\xE9pondre \xE0 au moins la premi\xE8re question.");
+      v("Merci de répondre à au moins la première question.");
       return;
     }
     try {
-      await X.post("questionnaires", {
-        appointment_id: e,
-        patient_id: n?.patient_id || null,
-        patient_email: n?.patient_email || "",
-        responses: a,
-        created_at: new Date().toISOString()
-      }, j), s("done");
+      const res = await fetch("/api/submit-questionnaire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointment_id: e,
+          patient_id: n?.patient_id || n?.id || null,
+          patient_email: n?.patient_email || "",
+          responses: a
+        })
+      });
+      if (res.ok) {
+        s("done");
+      } else {
+        await X.post("questionnaires", {
+          appointment_id: e,
+          patient_id: n?.patient_id || null,
+          patient_email: n?.patient_email || "",
+          responses: a,
+          created_at: new Date().toISOString()
+        }, j);
+        s("done");
+      }
     } catch {
-      v("Erreur lors de l'envoi. R\xE9essayez.");
+      v("Erreur lors de l'envoi. Réessayez.");
     }
   };
   if (u === "loading") return _jsx("div", {
@@ -17855,7 +17870,7 @@ function Mg({
       children: ["\u2139\uFE0F Ce questionnaire est ", _jsx("strong", {
         children: "enti\xE8rement facultatif"
       }), ". Les informations recueillies servent uniquement \xE0 adapter notre s\xE9lection de compl\xE9ments alimentaires. Elles ne constituent pas un acte m\xE9dical."]
-    }), (Vu || Wi).map(g => _jsxs("div", {
+    }), Wi.map(g => _jsxs("div", {
       style: {
         background: "#fff",
         borderRadius: 14,
