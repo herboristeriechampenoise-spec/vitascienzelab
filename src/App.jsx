@@ -10332,12 +10332,11 @@ function Tg({
   let [freshProfileFiles, setFreshProfileFiles] = useState(null);
   useEffect(() => {
     if (e?.id && !ee) {
-      // Use e.token (client's own session JWT) — anon key is blocked by RLS on profiles
-      const authToken = e.token || j;
-      X.get("profiles", `id=eq.${e.id}&select=client_files`, authToken).then(res => {
-        if (Array.isArray(res) && res[0]?.client_files) setFreshProfileFiles(res[0].client_files);
-      }).catch(() => {});
-      X.get("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`, authToken).then(notes => {
+      // Do NOT use e.token for the profiles fetch — Supabase JWT access tokens are too large
+      // and PostgREST returns 431. The profiles.client_files are already loaded at login
+      // via the signIn handler (lines ~9929-9930) and passed as e.client_files.
+      // Only fetch admin_notes with anon key — RLS may allow patient to read their own notes.
+      X.get("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`, j).then(notes => {
         if (Array.isArray(notes)) {
           let extracted = [];
           notes.forEach(n => {
