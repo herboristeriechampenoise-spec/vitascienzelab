@@ -9929,6 +9929,8 @@ function Dg({
             let de = await X.get("profiles", `id=eq.${M.id}`, B);
             Array.isArray(de) && de[0] && (O = de[0].client_files || [], L = de[0].guests || []);
           } catch {}
+          // Store client JWT in activeSessionToken so Ki(j) uses it for all subsequent requests
+          activeSessionToken = B;
           e({
             id: M.id,
             email: M.email,
@@ -10391,7 +10393,7 @@ function Tg({
       let C = [];
       try {
         if (ee) C = ue.appointments.filter(W => W.patient_id === e.id || W.patient_email === e.email);else {
-          let [W, le] = await Promise.all([X.get("appointments", `patient_id=eq.${e.id}&status=neq.archived&order=rdv_date.desc`, e.token), X.get("appointments", `patient_email=eq.${e.email}&status=neq.archived&order=rdv_date.desc`, e.token)]),
+          let [W, le] = await Promise.all([X.get("appointments", `patient_id=eq.${e.id}&status=neq.archived&order=rdv_date.desc`, j), X.get("appointments", `patient_email=eq.${e.email}&status=neq.archived&order=rdv_date.desc`, j)]),
             Ne = [...(Array.isArray(W) ? W : []), ...(Array.isArray(le) ? le : [])],
             De = new Set();
           C = Ne.filter(st => De.has(st.id) ? !1 : (De.add(st.id), !0)), C.sort((st, ke) => (ke.rdv_date || "").localeCompare(st.rdv_date || ""));
@@ -11464,7 +11466,7 @@ function Tg({
                         if (!ee) {
                           await X.patch("profiles", e.id, {
                             client_files: remainingFiles
-                          }, e.token);
+                          }, j);
                         }
                         t({
                           ...e,
@@ -11515,7 +11517,7 @@ function Tg({
                 const finalFiles = [...currentFiles, ...newFilesList];
 
                 if (!ee) {
-                  let patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, e.token).catch(() => null);
+                  let patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, j).catch(() => null);
                   if (!patchRes || patchRes.error || patchRes.code) {
                     patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, j).catch(() => null);
                   }
