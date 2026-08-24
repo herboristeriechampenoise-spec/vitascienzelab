@@ -14222,233 +14222,6 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             children: "\u2713 Marqu\xE9 envoy\xE9"
           })]
         })]
-      }), E === "mail_prep" && _jsxs("div", {
-        style: {
-          background: "#fff",
-          borderRadius: 16,
-          padding: "24px 28px",
-          boxShadow: "0 4px 20px rgba(21,101,192,.08)",
-          maxWidth: 680,
-          margin: "0 auto"
-        },
-        children: [
-          _jsxs("div", {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 24
-            },
-            children: [
-              _jsx("div", {
-                style: {
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  background: `linear-gradient(135deg,${q},${z})`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  color: "#fff"
-                },
-                children: "✉️"
-              }),
-              _jsxs("div", {
-                children: [
-                  _jsx("h3", {
-                    style: {
-                      fontFamily: "'Playfair Display',serif",
-                      fontSize: 20,
-                      color: z,
-                      margin: 0
-                    },
-                    children: "Envoyer l'email de préparation de séance"
-                  }),
-                  _jsx("p", {
-                    style: {
-                      fontSize: 12,
-                      color: "#78909C",
-                      margin: 0
-                    },
-                    children: "Sélectionnez le client de votre base de données et indiquez la date et l'horaire retenus."
-                  })
-                ]
-              })
-            ]
-          }),
-          _jsxs("div", {
-            style: { display: "flex", flexDirection: "column", gap: 16 },
-            children: [
-              _jsxs("div", {
-                children: [
-                  _jsx("label", {
-                    style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
-                    children: "👤 Client (liste effective de la base de données) *"
-                  }),
-                  _jsxs("select", {
-                    value: prepClient,
-                    onChange: ev => {
-                      const val = ev.target.value;
-                      setPrepClient(val);
-                      const found = w.find(c => c.id === val || c.email === val);
-                      if (found) {
-                        const pAppts = M.filter(a => a.patient_id === found.id || a.patient_email === found.email);
-                        if (pAppts.length > 0) {
-                          const latest = pAppts[0];
-                          if (latest.rdv_date) setPrepDate(latest.rdv_date);
-                          if (latest.slot) setPrepSlot(latest.slot);
-                        }
-                      }
-                    },
-                    style: Vl,
-                    children: [
-                      _jsx("option", { value: "", children: "-- Choisir un client dans la liste --" }),
-                      w.map(c => _jsx("option", {
-                        value: c.id,
-                        children: `${(c.nom || '').toUpperCase()} ${c.prenom || ''} (${c.email || 'Sans email'})`
-                      }, c.id))
-                    ]
-                  })
-                ]
-              }),
-              prepClient && (() => {
-                const cObj = w.find(c => c.id === prepClient || c.email === prepClient);
-                if (!cObj) return null;
-                return _jsxs("div", {
-                  style: {
-                    background: "#E8F0FE",
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    fontSize: 12,
-                    color: "#1565C0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between"
-                  },
-                  children: [
-                    _jsxs("div", {
-                      children: [
-                        _jsxs("strong", { children: [`${cObj.prenom || ''} ${cObj.nom || ''}`.trim()] }),
-                        _jsxs("span", { style: { marginLeft: 8, opacity: 0.85 }, children: [`📧 ${cObj.email || ''}`] }),
-                        cObj.tel && _jsxs("span", { style: { marginLeft: 8, opacity: 0.85 }, children: [`📞 ${cObj.tel}`] })
-                      ]
-                    }),
-                    _jsx("span", { style: { fontSize: 11, background: "#1565C0", color: "#fff", padding: "2px 8px", borderRadius: 12 }, children: "Client sélectionné" })
-                  ]
-                });
-              })(),
-              _jsxs("div", {
-                style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 },
-                children: [
-                  _jsxs("div", {
-                    children: [
-                      _jsx("label", {
-                        style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
-                        children: "📅 Date de la séance *"
-                      }),
-                      _jsx("input", {
-                        type: "date",
-                        value: prepDate,
-                        onChange: ev => setPrepDate(ev.target.value),
-                        style: Vl
-                      })
-                    ]
-                  }),
-                  _jsxs("div", {
-                    children: [
-                      _jsx("label", {
-                        style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
-                        children: "⏰ Horaire / Créneau retenu *"
-                      }),
-                      _jsxs("select", {
-                        value: prepSlot,
-                        onChange: ev => setPrepSlot(ev.target.value),
-                        style: Vl,
-                        children: [
-                          ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"].map(s => _jsx("option", {
-                            value: s,
-                            children: s
-                          }, s))
-                        ]
-                      })
-                    ]
-                  })
-                ]
-              }),
-              _jsxs("div", {
-                children: [
-                  _jsx("label", {
-                    style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
-                    children: "🌿 Intitulé du motif / prestation"
-                  }),
-                  _jsx("input", {
-                    type: "text",
-                    value: prepService,
-                    onChange: ev => setPrepService(ev.target.value),
-                    placeholder: "Ex: Séance de Conseil en Compléments",
-                    style: Vl
-                  })
-                ]
-              }),
-              _jsxs("div", {
-                style: {
-                  background: "#F8FAFC",
-                  border: `1px solid #E2E8F0`,
-                  borderRadius: 12,
-                  padding: 14
-                },
-                children: [
-                  _jsx("div", {
-                    style: { fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
-                    children: "👁️ Aperçu du mail qui sera envoyé :"
-                  }),
-                  _jsxs("div", {
-                    style: { fontSize: 12, color: z, lineHeight: 1.5 },
-                    children: [
-                      _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [_jsx("strong", { children: "À : " }), prepClient ? (w.find(c => c.id === prepClient || c.email === prepClient)?.email || "Non renseigné") : "Sélectionnez un client"] }),
-                      _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [_jsx("strong", { children: "Objet : " }), `📋 Préparation de votre séance du ${prepDate ? prepDate : '[Date]'} à ${prepSlot} – VITASCIENZELAB`] }),
-                      _jsxs("div", {
-                        style: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: 10, marginTop: 6, fontSize: 12, color: "#475569" },
-                        children: [
-                          _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [`Bonjour ${prepClient ? (w.find(c => c.id === prepClient || c.email === prepClient)?.prenom || "Client") : "Client"},`] }),
-                          _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [`Nous avons le plaisir de vous confirmer notre séance prévue le `, _jsx("strong", { children: `${prepDate ? prepDate : '[Date]'} à ${prepSlot}` }), `.`] }),
-                          _jsx("p", { style: { margin: "0 0 4px 0" }, children: "• 📋 Remplir votre questionnaire de préparation (objectifs & compléments actuels)" }),
-                          _jsx("p", { style: { margin: "0" }, children: "• 📁 Déposer vos documents médicaux sur votre espace personnel" })
-                        ]
-                      })
-                    ]
-                  })
-                ]
-              }),
-              prepStatus && _jsx("div", {
-                style: {
-                  padding: "12px 16px",
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  background: prepStatus.includes("✅") ? "#E8F5E9" : "#FFEBEE",
-                  color: prepStatus.includes("✅") ? "#2E7D32" : "#C62828",
-                  border: `1px solid ${prepStatus.includes("✅") ? "#A5D6A7" : "#EF9A9A"}`
-                },
-                children: prepStatus
-              }),
-              _jsx(ze, {
-                onClick: handleSendPrepEmail,
-                disabled: prepLoading,
-                style: {
-                  width: "100%",
-                  marginTop: 6,
-                  padding: "14px",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  background: prepLoading ? "#B0BEC5" : "linear-gradient(135deg,#1565C0,#0D47A1)"
-                },
-                children: prepLoading ? "⏳ Envoi du mail en cours..." : "🚀 Envoyer l'email de préparation au client"
-              })
-            ]
-          })
-        ]
       }), E === "nouveau" && _jsxs("div", {
         children: [_jsxs("div", {
           style: {
@@ -15420,6 +15193,233 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             })]
           })]
         })
+      }), E === "mail_prep" && _jsxs("div", {
+        style: {
+          background: "#fff",
+          borderRadius: 16,
+          padding: "24px 28px",
+          boxShadow: "0 4px 20px rgba(21,101,192,.08)",
+          maxWidth: 680,
+          margin: "0 auto"
+        },
+        children: [
+          _jsxs("div", {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 24
+            },
+            children: [
+              _jsx("div", {
+                style: {
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: `linear-gradient(135deg,${q},${z})`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  color: "#fff"
+                },
+                children: "✉️"
+              }),
+              _jsxs("div", {
+                children: [
+                  _jsx("h3", {
+                    style: {
+                      fontFamily: "'Playfair Display',serif",
+                      fontSize: 20,
+                      color: z,
+                      margin: 0
+                    },
+                    children: "Envoyer l'email de préparation de séance"
+                  }),
+                  _jsx("p", {
+                    style: {
+                      fontSize: 12,
+                      color: "#78909C",
+                      margin: 0
+                    },
+                    children: "Sélectionnez le client de votre base de données et indiquez la date et l'horaire retenus."
+                  })
+                ]
+              })
+            ]
+          }),
+          _jsxs("div", {
+            style: { display: "flex", flexDirection: "column", gap: 16 },
+            children: [
+              _jsxs("div", {
+                children: [
+                  _jsx("label", {
+                    style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
+                    children: "👤 Client (liste effective de la base de données) *"
+                  }),
+                  _jsxs("select", {
+                    value: prepClient,
+                    onChange: ev => {
+                      const val = ev.target.value;
+                      setPrepClient(val);
+                      const found = w.find(c => c.id === val || c.email === val);
+                      if (found) {
+                        const pAppts = M.filter(a => a.patient_id === found.id || a.patient_email === found.email);
+                        if (pAppts.length > 0) {
+                          const latest = pAppts[0];
+                          if (latest.rdv_date) setPrepDate(latest.rdv_date);
+                          if (latest.slot) setPrepSlot(latest.slot);
+                        }
+                      }
+                    },
+                    style: Vl,
+                    children: [
+                      _jsx("option", { value: "", children: "-- Choisir un client dans la liste --" }),
+                      w.map(c => _jsx("option", {
+                        value: c.id,
+                        children: `${(c.nom || '').toUpperCase()} ${c.prenom || ''} (${c.email || 'Sans email'})`
+                      }, c.id))
+                    ]
+                  })
+                ]
+              }),
+              prepClient && (() => {
+                const cObj = w.find(c => c.id === prepClient || c.email === prepClient);
+                if (!cObj) return null;
+                return _jsxs("div", {
+                  style: {
+                    background: "#E8F0FE",
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    fontSize: 12,
+                    color: "#1565C0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between"
+                  },
+                  children: [
+                    _jsxs("div", {
+                      children: [
+                        _jsxs("strong", { children: [`${cObj.prenom || ''} ${cObj.nom || ''}`.trim()] }),
+                        _jsxs("span", { style: { marginLeft: 8, opacity: 0.85 }, children: [`📧 ${cObj.email || ''}`] }),
+                        cObj.tel && _jsxs("span", { style: { marginLeft: 8, opacity: 0.85 }, children: [`📞 ${cObj.tel}`] })
+                      ]
+                    }),
+                    _jsx("span", { style: { fontSize: 11, background: "#1565C0", color: "#fff", padding: "2px 8px", borderRadius: 12 }, children: "Client sélectionné" })
+                  ]
+                });
+              })(),
+              _jsxs("div", {
+                style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 },
+                children: [
+                  _jsxs("div", {
+                    children: [
+                      _jsx("label", {
+                        style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
+                        children: "📅 Date de la séance *"
+                      }),
+                      _jsx("input", {
+                        type: "date",
+                        value: prepDate,
+                        onChange: ev => setPrepDate(ev.target.value),
+                        style: Vl
+                      })
+                    ]
+                  }),
+                  _jsxs("div", {
+                    children: [
+                      _jsx("label", {
+                        style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
+                        children: "⏰ Horaire / Créneau retenu *"
+                      }),
+                      _jsxs("select", {
+                        value: prepSlot,
+                        onChange: ev => setPrepSlot(ev.target.value),
+                        style: Vl,
+                        children: [
+                          ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"].map(s => _jsx("option", {
+                            value: s,
+                            children: s
+                          }, s))
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              }),
+              _jsxs("div", {
+                children: [
+                  _jsx("label", {
+                    style: { display: "block", fontSize: 13, fontWeight: 700, color: z, marginBottom: 6 },
+                    children: "🌿 Intitulé du motif / prestation"
+                  }),
+                  _jsx("input", {
+                    type: "text",
+                    value: prepService,
+                    onChange: ev => setPrepService(ev.target.value),
+                    placeholder: "Ex: Séance de Conseil en Compléments",
+                    style: Vl
+                  })
+                ]
+              }),
+              _jsxs("div", {
+                style: {
+                  background: "#F8FAFC",
+                  border: `1px solid #E2E8F0`,
+                  borderRadius: 12,
+                  padding: 14
+                },
+                children: [
+                  _jsx("div", {
+                    style: { fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
+                    children: "👁️ Aperçu du mail qui sera envoyé :"
+                  }),
+                  _jsxs("div", {
+                    style: { fontSize: 12, color: z, lineHeight: 1.5 },
+                    children: [
+                      _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [_jsx("strong", { children: "À : " }), prepClient ? (w.find(c => c.id === prepClient || c.email === prepClient)?.email || "Non renseigné") : "Sélectionnez un client"] }),
+                      _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [_jsx("strong", { children: "Objet : " }), `📋 Préparation de votre séance du ${prepDate ? prepDate : '[Date]'} à ${prepSlot} – VITASCIENZELAB`] }),
+                      _jsxs("div", {
+                        style: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: 10, marginTop: 6, fontSize: 12, color: "#475569" },
+                        children: [
+                          _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [`Bonjour ${prepClient ? (w.find(c => c.id === prepClient || c.email === prepClient)?.prenom || "Client") : "Client"},`] }),
+                          _jsxs("p", { style: { margin: "0 0 4px 0" }, children: [`Nous avons le plaisir de vous confirmer notre séance prévue le `, _jsx("strong", { children: `${prepDate ? prepDate : '[Date]'} à ${prepSlot}` }), `.`] }),
+                          _jsx("p", { style: { margin: "0 0 4px 0" }, children: "• 📋 Remplir votre questionnaire de préparation (objectifs & compléments actuels)" }),
+                          _jsx("p", { style: { margin: "0" }, children: "• 📁 Déposer vos documents médicaux sur votre espace personnel" })
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              }),
+              prepStatus && _jsx("div", {
+                style: {
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: prepStatus.includes("✅") ? "#E8F5E9" : "#FFEBEE",
+                  color: prepStatus.includes("✅") ? "#2E7D32" : "#C62828",
+                  border: `1px solid ${prepStatus.includes("✅") ? "#A5D6A7" : "#EF9A9A"}`
+                },
+                children: prepStatus
+              }),
+              _jsx(ze, {
+                onClick: handleSendPrepEmail,
+                disabled: prepLoading,
+                style: {
+                  width: "100%",
+                  marginTop: 6,
+                  padding: "14px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  background: prepLoading ? "#B0BEC5" : "linear-gradient(135deg,#1565C0,#0D47A1)"
+                },
+                children: prepLoading ? "⏳ Envoi du mail en cours..." : "🚀 Envoyer l'email de préparation au client"
+              })
+            ]
+          })
+        ]
       }), E === "agenda" && _jsxs("div", {
         children: [_jsxs("div", {
           style: {
