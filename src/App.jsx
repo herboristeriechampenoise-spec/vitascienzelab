@@ -8928,57 +8928,22 @@ const Vu = [{
 }];
 const Wi = [{
   k: "objectif_bienetre",
-  q: "Quel est votre objectif bien-\xEAtre principal pour cette s\xE9ance ?",
+  q: "Quel est votre objectif bien-être principal pour cette séance ?",
   type: "radio",
-  opts: ["Soutenir mon niveau d'\xE9nergie et ma vitalit\xE9 au quotidien", "Accompagner mon \xE9quilibre de poids par une approche nutritionnelle", "Soutenir mon confort digestif", "Renforcer mes d\xE9fenses naturelles de fa\xE7on pr\xE9ventive", "Am\xE9liorer la qualit\xE9 de mon sommeil", "Soutenir ma gestion du stress", "Bilan de mes habitudes nutritionnelles et s\xE9lection de compl\xE9ments adapt\xE9s", "Autre objectif de bien-\xEAtre personnel"]
-}, {
-  k: "mode_alimentaire",
-  q: "Comment d\xE9cririez-vous votre mode alimentaire habituel ?",
-  type: "radio",
-  opts: ["Omnivore vari\xE9 et \xE9quilibr\xE9", "Omnivore avec tendance aux exc\xE8s (sucres, graisses, repas irr\xE9guliers)", "V\xE9g\xE9tarien", "V\xE9g\xE9talien / Vegan", "Alimentation sans gluten", "Alimentation sans lactose", "Autre mode alimentaire sp\xE9cifique"]
-}, {
-  k: "repas_structure",
-  q: "Combien de repas prenez-vous g\xE9n\xE9ralement par jour ?",
-  type: "radio",
-  opts: ["1 \xE0 2 repas par jour", "3 repas r\xE9guliers", "3 repas et une ou plusieurs collations", "Alimentation fractionn\xE9e ou grignotage fr\xE9quent"]
-}, {
-  k: "hydratation_eau",
-  q: "Quelle est votre consommation d'eau quotidienne habituelle ?",
-  type: "radio",
-  opts: ["Moins d'1 litre par jour", "Entre 1 et 1,5 litre par jour", "Entre 1,5 et 2 litres par jour", "Plus de 2 litres par jour"]
+  opts: ["Soutenir mon niveau d'énergie et ma vitalité au quotidien", "Accompagner mon équilibre de poids par une approche nutritionnelle", "Soutenir mon confort digestif", "Renforcer mes défenses naturelles de façon préventive", "Améliorer la qualité de mon sommeil", "Soutenir ma gestion du stress", "Bilan de mes habitudes nutritionnelles et sélection de compléments adaptés", "Autre objectif de bien-être personnel"]
 }, {
   k: "vitalite_quotidienne",
-  q: "Comment \xE9valuez-vous votre vitalit\xE9 g\xE9n\xE9rale au quotidien ? (1 = tr\xE8s faible / 5 = excellente)",
+  q: "Comment évaluez-vous votre vitalité générale au quotidien ? (1 = très faible / 5 = excellente)",
   type: "scale"
-}, {
-  k: "preferences_alimentaires",
-  q: "Avez-vous des pr\xE9f\xE9rences ou contraintes alimentaires particuli\xE8res \xE0 nous communiquer ?",
-  type: "text",
-  ph: "Ex : allergie aux fruits \xE0 coques, v\xE9g\xE9tarien, sans porc, sans alcool\u2026 Ces informations nous aident \xE0 vous proposer des compl\xE9ments alimentaires compatibles avec votre mode de vie."
-}, {
-  k: "traitements_en_cours",
-  q: "Prenez-vous actuellement des m\xE9dicaments ou des compl\xE9ments alimentaires ?",
-  type: "text",
-  ph: "Cette information est recueillie dans le seul but de v\xE9rifier l'absence d'interactions connues avec les plantes et compl\xE9ments alimentaires que nous proposons. Ex : anticoagulants, antid\xE9presseurs, compl\xE9ments de fer, om\xE9ga-3\u2026 ou 'Aucun'"
-}, {
-  k: "activite_physique",
-  q: "Quelle est votre pratique d'activit\xE9 physique hebdomadaire ?",
-  type: "radio",
-  opts: ["Tr\xE8s peu ou pas d'activit\xE9 physique", "Activit\xE9 l\xE9g\xE8re (marche, \xE9tirements \u2014 1 \xE0 2h/semaine)", "Activit\xE9 mod\xE9r\xE9e (2 \xE0 3h/semaine)", "Activit\xE9 r\xE9guli\xE8re (3 \xE0 5h/semaine)", "Activit\xE9 intensive (plus de 5h/semaine)"]
-}, {
-  k: "qualite_sommeil",
-  q: "Comment qualifieriez-vous globalement la qualit\xE9 de votre sommeil ?",
-  type: "radio",
-  opts: ["Tr\xE8s bonne (sommeil r\xE9cup\xE9rateur, 7 \xE0 9h par nuit)", "Correcte avec quelques r\xE9veils nocturnes", "Insuffisante en dur\xE9e (moins de 6h par nuit)", "Perturb\xE9e (endormissement difficile ou r\xE9veils fr\xE9quents)", "Mauvaise de fa\xE7on chronique"]
 }, {
   k: "niveau_stress",
-  q: "Comment \xE9valuez-vous votre niveau de stress habituel au quotidien ? (1 = tr\xE8s serein / 5 = stress tr\xE8s \xE9lev\xE9)",
+  q: "Comment évaluez-vous votre niveau de stress habituel au quotidien ? (1 = très serein / 5 = stress très élevé)",
   type: "scale"
 }, {
-  k: "objectifs_complementaires",
-  q: "Y a-t-il des informations compl\xE9mentaires sur votre mode de vie ou vos habitudes que vous souhaitez partager pour personnaliser au mieux votre programme de compl\xE9ments alimentaires ?",
-  type: "text",
-  ph: "Ex : voyages fr\xE9quents, alimentation v\xE9gane depuis peu, pratique du je\xFBne intermittent, grossesse planifi\xE9e, allaitement en cours\u2026 Ces informations nous permettent uniquement d'adapter notre s\xE9lection de produits."
+  k: "traitements_en_cours",
+  q: "Prenez-vous actuellement des médicaments ou des compléments alimentaires ?",
+  type: "medlist",
+  ph: "Précisez vos éventuels médicaments ou compléments alimentaires..."
 }];
 const Ln = () => Math.random().toString(36).slice(2, 9);
 const it = e => {
@@ -17673,7 +17638,33 @@ function Mg({
   let [n, l] = useState(null),
     [a, i] = useState({}),
     [u, s] = useState("loading"),
-    [r, v] = useState("");
+    [r, v] = useState(""),
+    [medsList, setMedsList] = useState([""]);
+
+  let E = (g, p) => i(R => ({
+    ...R,
+    [g]: p
+  }));
+
+  let updateMedItem = (idx, val) => {
+    let newList = [...medsList];
+    newList[idx] = val;
+    setMedsList(newList);
+    let formatted = newList.map(item => item.trim()).filter(Boolean).map((item, k) => `${k + 1}. ${item}`).join("\n");
+    E("traitements_en_cours", formatted);
+  };
+
+  let addMedField = () => {
+    setMedsList(prev => [...prev, ""]);
+  };
+
+  let removeMedField = (idx) => {
+    let newList = medsList.filter((_, k) => k !== idx);
+    if (newList.length === 0) newList = [""];
+    setMedsList(newList);
+    let formatted = newList.map(item => item.trim()).filter(Boolean).map((item, k) => `${k + 1}. ${item}`).join("\n");
+    E("traitements_en_cours", formatted);
+  };
   useEffect(() => {
     if (!e) return;
     fetch(`/api/get-questionnaire-info?id=${e}`).then(res => res.json()).then(data => {
@@ -17821,10 +17812,6 @@ function Mg({
       })]
     })
   });
-  let E = (g, p) => i(R => ({
-    ...R,
-    [g]: p
-  }));
   return _jsxs("div", {
     style: {
       maxWidth: 560,
@@ -17969,6 +17956,69 @@ function Mg({
           resize: "vertical",
           outline: "none"
         }
+      }), g.type === "medlist" && _jsxs("div", {
+        children: [
+          medsList.map((medVal, idx) => _jsxs("div", {
+            style: {
+              display: "flex",
+              gap: 8,
+              marginBottom: 10,
+              alignItems: "flex-start"
+            },
+            children: [
+              _jsx("textarea", {
+                value: medVal,
+                onChange: ev => updateMedItem(idx, ev.target.value),
+                placeholder: `Médicament ou complément #${idx + 1} (ex: Paracétamol 1000mg, Vitamine D, Magnésium...)`,
+                rows: 2,
+                style: {
+                  flex: 1,
+                  border: `1px solid ${V}`,
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 13,
+                  color: z,
+                  resize: "vertical",
+                  outline: "none"
+                }
+              }),
+              medsList.length > 1 && _jsx("button", {
+                type: "button",
+                onClick: () => removeMedField(idx),
+                style: {
+                  background: "#FCE4EC",
+                  border: "none",
+                  color: "#C62828",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  marginTop: 4
+                },
+                title: "Supprimer",
+                children: "✕"
+              })
+            ]
+          }, idx)),
+          _jsx("button", {
+            type: "button",
+            onClick: addMedField,
+            style: {
+              width: "100%",
+              background: "#E8F0FE",
+              border: `1px dashed ${q}`,
+              color: q,
+              borderRadius: 10,
+              padding: "10px 14px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              marginTop: 6,
+              textAlign: "center"
+            },
+            children: "➕ Ajouter un médicament dans la liste, cliquez ici"
+          })
+        ]
       })]
     }, g.k)), r && _jsx("p", {
       style: {
