@@ -8757,9 +8757,38 @@ const k0 = on((bv, N0) => {
 });
 const Ge = import.meta.env.VITE_SUPABASE_URL || "https://zbavzvcnmlwbsepfsnbi.supabase.co";
 const j = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiYXZ6dmNubWx3YnNlcGZzbmJpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNzE1MzEsImV4cCI6MjA5Mjk0NzUzMX0.yn8SfqytABe0DxjMGgJMK-ZFo3yrDDbn4Lx-b-uGz0I";
-// Service role key — bypasses RLS for admin writes (profiles PATCH, admin_notes DELETE)
-// Already configured in Vercel env vars and .env.local as VITE_SUPABASE_SERVICE_ROLE
-const svc = import.meta.env.VITE_SUPABASE_SERVICE_ROLE || "";
+const adminPatch = async (table, id, data) => {
+  try {
+    const res = await fetch("/api/admin-write", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operation: "patch", table, id, data })
+    });
+    if (!res.ok) {
+      if (!ee) await X.patch(table, id, data, j).catch(() => {});
+    }
+    return res.ok;
+  } catch (err) {
+    console.error("adminPatch error:", err);
+    if (!ee) await X.patch(table, id, data, j).catch(() => {});
+    return false;
+  }
+};
+
+const adminDelete = async (table, id) => {
+  try {
+    const res = await fetch("/api/admin-write", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operation: "delete", table, id })
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("adminDelete error:", err);
+    return false;
+  }
+};
+
 let activeSessionToken = null;
 const ee = Ge.includes("VOTRE");
 const Sg = "692312814786-4mrf2rt3us6kkrhqdai4624puhisrog2.apps.googleusercontent.com";
@@ -13257,7 +13286,7 @@ function Rg({
               let hasNew = files.some(f => f.uploaded_by === "client" && f.is_new_for_admin === true);
               if (hasNew) {
                 files = files.map(f => f.uploaded_by === "client" && f.is_new_for_admin === true ? { ...f, is_new_for_admin: false } : f);
-                await X.patch("profiles", targetProf.id, { client_files: files }, svc).catch(err => console.error("Error marking files read:", err));
+                await adminPatch("profiles", targetProf.id, { client_files: files });
                 B(prev => prev.map(p => (p.id === targetProf.id || p.email === targetProf.email) ? { ...p, client_files: files } : p));
               }
               L(N => ({
@@ -13673,9 +13702,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             from_slot: c.slot,
             from_name: c.patient_name
           }))];
-          await X.patch("profiles", O.id, {
+          await adminPatch("profiles", O.id, {
             historical_docs: y
-          }, svc).catch(() => {}), L(b => ({
+          }), L(b => ({
             ...b,
             historical_docs: y
           }));
@@ -16419,9 +16448,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       if (window.confirm(`Supprimer "${D.s}" ?`)) {
                         if (D.fromProfile) {
                           let $ = (O.all_supplements || []).filter((Xe, $e) => $e !== D.idx);
-                          ee || (await X.patch("profiles", O.id, {
+                          ee || (await adminPatch("profiles", O.id, {
                             all_supplements: $
-                          }, svc)), L(Xe => ({
+                          })), L(Xe => ({
                             ...Xe,
                             all_supplements: $
                           }));
@@ -16502,9 +16531,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       if (window.confirm(`Supprimer "${D.name}" ?`)) {
                         if (D.fromProfile) {
                           let $ = (O.client_docs || []).filter(Xe => !(Xe.name === D.name && Xe.from_rdv === D.from_rdv));
-                          ee || (await X.patch("profiles", O.id, {
+                          ee || (await adminPatch("profiles", O.id, {
                             client_docs: $
-                          }, svc)), L(Xe => ({
+                          })), L(Xe => ({
                             ...Xe,
                             client_docs: $
                           }));
@@ -16764,7 +16793,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                           const updatedDoc = { ...c, data: b64Data, date: new Date().toLocaleDateString("fr-FR") };
                           let updatedList = (O.client_files || []).map(f => f.name === c.name ? updatedDoc : f);
                           if (!updatedList.some(f => f.name === c.name)) updatedList.push(updatedDoc);
-                          await X.patch("profiles", O.id, { client_files: updatedList }, svc);
+                          await adminPatch("profiles", O.id, { client_files: updatedList });
                           L(prev => ({ ...prev, client_files: updatedList }));
                           B(prev => prev.map(p => p.id === O.id ? { ...p, client_files: updatedList } : p));
                         };
@@ -16795,10 +16824,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       }
 
                       for (let note of notesToDelete) {
-                        await fetch(`${Ge}/rest/v1/admin_notes?id=eq.${note.id}`, {
-                          method: "DELETE",
-                          headers: { apikey: svc, Authorization: `Bearer ${svc}` }
-                        }).catch(() => {});
+                        await adminDelete("admin_notes", note.id);
                       }
 
                       // Update Oe state to remove deleted notes
@@ -16806,7 +16832,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
 
                       // Remove from profiles.client_files
                       let b = (O.client_files || []).filter(f => f.name !== c.name);
-                      if (!ee) await X.patch("profiles", O.id, { client_files: b }, svc);
+                      if (!ee) await adminPatch("profiles", O.id, { client_files: b });
                       L(_ => ({ ..._, client_files: b }));
                       B(_ => _.map(G => G.id === O.id ? { ...G, client_files: b } : G));
                     } catch (err) {
@@ -16852,7 +16878,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
 
                 if (!ee) {
                   // Save files permanently into profiles.client_files so clients can read them (admin_notes is blocked by RLS for clients)
-                  await X.patch("profiles", O.id, { client_files: finalFiles }, svc).catch(err => console.error("Profile patch error:", err));
+                  await adminPatch("profiles", O.id, { client_files: finalFiles });
                   for (let fileObj of newFilesList) {
                     const noteText = `📁 FICHIER ADMIN — ${JSON.stringify(fileObj)}`;
                     await X.post("admin_notes", {
