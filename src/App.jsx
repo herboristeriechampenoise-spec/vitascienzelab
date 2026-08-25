@@ -10447,9 +10447,9 @@ function Tg({
         if (ee) {
           let W = ue.appointments.find(le => le.id === C.id);
           W && (W.status = "cancelled");
-        } else await X.patch("appointments", C.id, {
+        } else await adminPatch("appointments", C.id, {
           status: "cancelled"
-        }, j);
+        });
         i(W => W.map(le => le.id === C.id ? {
           ...le,
           status: "cancelled"
@@ -10482,7 +10482,7 @@ function Tg({
       if (ee) {
         let le = ue.appointments.find(Ne => Ne.id === B.id);
         le && Object.assign(le, C);
-      } else await X.patch("appointments", B.id, C, j);
+      } else await adminPatch("appointments", B.id, C);
       i(le => le.map(Ne => Ne.id === B.id ? {
         ...Ne,
         ...C
@@ -13356,9 +13356,9 @@ function Rg({
       if (await jn(c.patient_email, "\u23F0 Rappel \u2014 Votre s\xE9ance VITASCIENZELAB est dans 48h", Ji(c, "48h")), ee) {
         let y = ue.appointments.find(b => b.id === c.id);
         y && (y.reminder_sent = !0);
-      } else await X.patch("appointments", c.id, {
+      } else await adminPatch("appointments", c.id, {
         reminder_sent: !0
-      }, j);
+      });
       R(y => y.map(b => b.id === c.id ? {
         ...b,
         reminder_sent: !0
@@ -13746,14 +13746,13 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             }
           }
         }
-        ee ? ue.appointments = ue.appointments.filter(y => y.id !== c.id) : await fetch(`${Ge}/rest/v1/appointments?id=eq.${c.id}`, {
-          method: "DELETE",
-          headers: {
-            apikey: j,
-            Authorization: `Bearer ${j}`,
-            Prefer: "return=minimal"
-          }
-        }), R(y => y.filter(b => b.id !== c.id)), gt(y => y.filter(b => b.id !== c.id));
+        if (ee) {
+          ue.appointments = ue.appointments.filter(y => y.id !== c.id);
+        } else {
+          await adminDelete("appointments", c.id);
+        }
+        R(y => y.filter(b => b.id !== c.id));
+        gt(y => y.filter(b => b.id !== c.id));
       } catch (y) {
         console.error(y);
       }
@@ -14016,10 +14015,10 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
             children: "Annuler"
           }), _jsx(ze, {
             onClick: async () => {
-              !f || !d || (await X.patch("appointments", k.id, {
+              !f || !d || (await adminPatch("appointments", k.id, {
                 rdv_date: f,
                 slot: d
-              }, j), R(c => c.map(y => y.id === k.id ? {
+              }), R(c => c.map(y => y.id === k.id ? {
                 ...y,
                 rdv_date: f,
                 slot: d
@@ -15224,10 +15223,10 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               children: "Annuler"
             }), _jsx(ze, {
               onClick: async () => {
-                !f || !d || (await X.patch("appointments", k.id, {
+                !f || !d || (await adminPatch("appointments", k.id, {
                   rdv_date: f,
                   slot: d
-                }, j), R(c => c.map(y => y.id === k.id ? {
+                }), R(c => c.map(y => y.id === k.id ? {
                   ...y,
                   rdv_date: f,
                   slot: d
@@ -16719,9 +16718,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                           }));
                         } else if (D.rdv) {
                           let $ = (D.rdv.supplements || []).filter((Xe, $e) => $e !== D.si);
-                          ee || (await X.patch("appointments", D.rdv.id, {
+                          ee || (await adminPatch("appointments", D.rdv.id, {
                             supplements: $
-                          }, j)), gt(Xe => Xe.map($e => $e.id === D.rdv.id ? {
+                          })), gt(Xe => Xe.map($e => $e.id === D.rdv.id ? {
                             ...$e,
                             supplements: $
                           } : $e));
@@ -16803,10 +16802,10 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                         } else if (D.rdv) {
                           let $ = (D.rdv.docs || []).filter(($e, Sl) => Sl !== D.rdvDocIdx),
                             Xe = (D.rdv.docs_data || []).filter(($e, Sl) => Sl !== D.rdvDocIdx);
-                          ee || (await X.patch("appointments", D.rdv.id, {
+                          ee || (await adminPatch("appointments", D.rdv.id, {
                             docs: $,
                             docs_data: Xe
-                          }, j)), gt($e => $e.map(Sl => Sl.id === D.rdv.id ? {
+                          })), gt($e => $e.map(Sl => Sl.id === D.rdv.id ? {
                             ...Sl,
                             docs: $,
                             docs_data: Xe

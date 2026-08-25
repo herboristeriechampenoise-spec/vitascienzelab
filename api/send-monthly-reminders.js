@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   // 1. Authorization check (allow Vercel Cron or authenticated Admin user)
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.authorization;
-  const isVercelCron = req.headers["x-vercel-cron"] === "true" || (cronSecret && authHeader === `Bearer ${cronSecret}`);
+  const isVercelCron = cronSecret ? (authHeader === `Bearer ${cronSecret}`) : (req.headers["x-vercel-cron"] === "true");
 
   let isAdmin = false;
 
