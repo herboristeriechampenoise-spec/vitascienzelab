@@ -1,5 +1,5 @@
 // api/admin-write.js
-// Server-side endpoint for admin writes requiring service role key (bypasses RLS)
+// Server-side endpoint for admin reads/writes requiring service role key (bypasses RLS)
 // The service key stays server-side — never exposed in the browser bundle
 
 export default async function handler(req, res) {
@@ -22,10 +22,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
-  const { operation, table, id, data } = body || {};
+  const { operation, table, id, data, query } = body || {};
 
-  if (!operation || !table || !id) {
-    return res.status(400).json({ error: 'Missing required fields: operation, table, id' });
+  if (!operation || !table) {
+    return res.status(400).json({ error: 'Missing required fields: operation, table' });
   }
 
   const svcHeaders = {
@@ -36,7 +36,26 @@ export default async function handler(req, res) {
   };
 
   try {
+    if (operation === 'get') {
+      const qStr = query || 'select=*';
+      const r = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + qStr, {
+        method: 'GET',
+        headers: {
+          apikey: SERVICE_KEY,
+          Authorization: 'Bearer ' + SERVICE_KEY
+        }
+      });
+      if (!r.ok) {
+        const errText = await r.text();
+        console.error('admin-write get failed ' + r.status + ':', errText);
+        return res.status(r.status).json({ error: errText });
+      }
+      const json = await r.json();
+      return res.status(200).json(json);
+    }
+
     if (operation === 'patch') {
+      if (!id) return res.status(400).json({ error: 'Missing id for patch' });
       const r = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + id, {
         method: 'PATCH',
         headers: svcHeaders,
@@ -51,6 +70,7 @@ export default async function handler(req, res) {
     }
 
     if (operation === 'delete') {
+      if (!id) return res.status(400).json({ error: 'Missing id for delete' });
       const r = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + id, {
         method: 'DELETE',
         headers: svcHeaders
@@ -63,7 +83,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    return res.status(400).json({ error: 'Unknown operation. Use: patch, delete' });
+    return res.status(400).json({ error: 'Unknown operation. Use: get, patch, delete' });
 
   } catch (err) {
     console.error('admin-write error:', err);

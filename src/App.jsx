@@ -8789,6 +8789,23 @@ const adminDelete = async (table, id) => {
   }
 };
 
+const adminGet = async (table, query = "select=*") => {
+  try {
+    const res = await fetch("/api/admin-write", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operation: "get", table, query })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch (err) {
+    console.error("adminGet error:", err);
+  }
+  return X.get(table, query, j).catch(() => []);
+};
+
 let activeSessionToken = null;
 const ee = Ge.includes("VOTRE");
 const Sg = "692312814786-4mrf2rt3us6kkrhqdai4624puhisrog2.apps.googleusercontent.com";
@@ -13201,7 +13218,11 @@ function Rg({
           created_at: y.created_at
         });
       }), B(Object.values(c).filter(y => y.email && y.email.trim() !== "").sort((y, b) => (y.nom || "").localeCompare(b.nom || ""))), Y([...ue.blocked]);
-    } else Promise.all([X.get("appointments", "status=neq.archived&order=rdv_date.asc", j), X.get("profiles", "select=id,email,prenom,nom,tel,dob,created_at,guests&order=created_at.desc", j), X.get("blocked_slots", "order=blocked_date.asc", j)]).then(([c, y, b]) => {
+    } else Promise.all([
+      adminGet("appointments", "status=neq.archived&order=rdv_date.asc"),
+      adminGet("profiles", "select=*&order=created_at.desc"),
+      adminGet("blocked_slots", "order=blocked_date.asc")
+    ]).then(([c, y, b]) => {
       if (Array.isArray(c)) {
         R(c);
         try {
@@ -13295,7 +13316,7 @@ function Rg({
             G = b ? `patient_id=eq.${c.id}&order=created_at.desc` : `patient_id=eq.${c.id}&order=created_at.desc`,
             H = b && y ? `or=(patient_id.eq.${c.id},patient_email.eq.${encodeURIComponent(c.email)})&order=created_at.desc` : y ? `patient_email=eq.${encodeURIComponent(c.email)}&order=created_at.desc` : `patient_id=eq.${c.id}&order=created_at.desc`,
             profParam = b ? `id=eq.${c.id}` : y ? `email=eq.${encodeURIComponent(c.email)}` : null;
-          profParam && X.get("profiles", profParam, j).then(async F => {
+          profParam && adminGet("profiles", profParam).then(async F => {
             if (Array.isArray(F) && F[0]) {
               let targetProf = F[0];
               let files = Array.isArray(targetProf.client_files) ? targetProf.client_files : [];
@@ -13315,7 +13336,7 @@ function Rg({
                 has_account: true
               }));
             }
-          }).catch(() => {}), Promise.all([X.get("appointments", _, j), X.get("admin_notes", G, j), X.get("questionnaires", H, j)]).then(([F, N, K]) => {
+          }).catch(() => {}), Promise.all([adminGet("appointments", _), adminGet("admin_notes", G), adminGet("questionnaires", H)]).then(([F, N, K]) => {
             if (Array.isArray(F)) {
               let P = new Date(),
                 Ye = F.filter(D => {
