@@ -10464,13 +10464,14 @@ function Tg({
         if (ee) {
           let W = ue.appointments.find(le => le.id === C.id);
           W && (W.status = "cancelled");
-        } else await adminPatch("appointments", C.id, {
-          status: "cancelled"
-        });
-        i(W => W.map(le => le.id === C.id ? {
-          ...le,
-          status: "cancelled"
-        } : le)), await jn(e.email, "\u274C S\xE9ance annul\xE9e \u2014 VITASCIENZELAB", `<div style="font-family:sans-serif;padding:20px;max-width:500px">
+        } else if (C.id && (C.id.startsWith("RDV_PREP_") || C.id.startsWith("RDV_BERTHAUX_"))) {
+          await adminDelete("appointments", C.id);
+        } else {
+          await adminPatch("appointments", C.id, {
+            status: "cancelled"
+          });
+        }
+        i(W => W.filter(le => le.id !== C.id)), await jn(e.email, "\u274C S\xE9ance annul\xE9e \u2014 VITASCIENZELAB", `<div style="font-family:sans-serif;padding:20px;max-width:500px">
         <h2 style="color:#C62828">S\xE9ance annul\xE9e</h2>
         <p>Votre s\xE9ance du <strong>${vt(C.rdv_date)}</strong> \xE0 <strong>${C.slot}</strong> a bien \xE9t\xE9 annul\xE9e.</p>
         <p style="color:#546E7A">Pour reprendre rendez-vous : <a href="https://vitascienzelab.vercel.app">vitascienzelab.vercel.app</a></p>
@@ -16401,7 +16402,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               fontSize: 13
             },
             children: "Aucune s\xE9ance."
-          }) : de.filter(c => c.status !== "archived").map(c => _jsxs("div", {
+          }) : de.filter(c => c.status !== "archived" && c.status !== "cancelled" && !c.id?.startsWith("RDV_PREP_") && !c.id?.startsWith("RDV_BERTHAUX_")).map(c => _jsxs("div", {
             style: {
               display: "flex",
               justifyContent: "space-between",
