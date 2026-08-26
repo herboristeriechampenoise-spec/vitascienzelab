@@ -15335,7 +15335,7 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       setPrepClient(val);
                       const found = w.find(c => c.id === val || c.email === val);
                       if (found) {
-                        const pAppts = M.filter(a => a.patient_id === found.id || a.patient_email === found.email);
+                        const pAppts = p.filter(a => a.patient_id === found.id || a.patient_email === found.email);
                         if (pAppts.length > 0) {
                           const latest = pAppts[0];
                           if (latest.rdv_date) setPrepDate(latest.rdv_date);

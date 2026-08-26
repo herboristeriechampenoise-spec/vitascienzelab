@@ -4,8 +4,23 @@ function formatDateFr(dateStr) {
   try {
     const parts = dateStr.split("-");
     if (parts.length === 3) {
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      const year = parseInt(parts[0], 10);
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const dayNum = parseInt(parts[2], 10);
+
+      const months = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+      ];
+      const days = [
+        "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"
+      ];
+
+      const d = new Date(year, monthIdx, dayNum, 12, 0, 0);
+      const dayName = days[d.getDay()];
+      const monthName = months[monthIdx];
+
+      return `${dayName} ${dayNum} ${monthName} ${year}`;
     }
   } catch(e) {}
   return dateStr;
@@ -33,12 +48,14 @@ export default async function handler(req, res) {
 
   const { clientName, clientEmail, patientId, rdvDate, slot, serviceTitle } = body || {};
 
-  if (!clientEmail || !rdvDate || !slot) {
-    return res.status(400).json({ error: "Champs manquants: clientEmail, rdvDate, slot requis" });
+  if (!clientEmail) {
+    return res.status(400).json({ error: "Champs manquants: clientEmail requis" });
   }
 
-  const apptId = "RDV_PREP_" + (patientId || "GUEST").slice(0, 8) + "_" + rdvDate.replace(/-/g, "") + "_" + slot.replace(/:/g, "");
-  const formattedDate = formatDateFr(rdvDate);
+  const dateToUse = rdvDate || new Date().toISOString().split("T")[0];
+  const slotToUse = slot || "17:00";
+  const apptId = "RDV_PREP_" + (patientId || "GUEST").slice(0, 8) + "_" + dateToUse.replace(/-/g, "") + "_" + slotToUse.replace(/:/g, "");
+  const formattedDate = formatDateFr(dateToUse);
   const firstName = (clientName || "").split(" ")[0] || "Client";
 
   try {
@@ -61,8 +78,8 @@ export default async function handler(req, res) {
           patient_id: patientId || null,
           patient_name: clientName || firstName,
           patient_email: clientEmail,
-          rdv_date: rdvDate,
-          slot: slot,
+          rdv_date: dateToUse,
+          slot: slotToUse,
           status: "confirmed",
           service_id: "conseil",
           service_title: serviceTitle || "Séance de Conseil en Compléments"
@@ -99,20 +116,20 @@ export default async function handler(req, res) {
       <p>Herboristerie Champenoise</p>
     </div>
     <div class="content">
-      <p>Bonjour " + firstName + ",</p>
-      <p>Nous avons le plaisir de vous confirmer notre séance de discussion prévue le <strong>" + formattedDate + " à " + slot + "</strong>.</p>
+      <p>Bonjour ${firstName},</p>
+      <p>Nous avons le plaisir de vous confirmer notre séance de discussion prévue le <strong>${formattedDate} à ${slotToUse}</strong>.</p>
       <p>Afin de préparer au mieux notre échange et de prendre connaissance de vos besoins et attentes, nous vous invitons à réaliser les démarches suivantes :</p>
       
       <div class="card">
         <h3>1. 📋 Remplir votre questionnaire de préparation</h3>
         <p style="margin-bottom:12px; font-size:14px;">Merci d'indiquer votre objectif principal et de lister vos éventuels médicaments ou compléments alimentaires actuels :</p>
-        <a href="" + questUrl + "" class="btn">Remplir le questionnaire de préparation</a>
+        <a href="${questUrl}" class="btn">Remplir le questionnaire de préparation</a>
       </div>
 
       <div class="card">
         <h3>2. 📁 Déposer vos documents médicaux</h3>
         <p style="margin-bottom:12px; font-size:14px;">Si vous disposez de documents médicaux récents (bilans sanguins, analyses, ordonnances ou comptes-rendus) permettant de prendre acte de votre état de santé général, vous pouvez les téléverser sur votre espace personnel :</p>
-        <a href="" + clientSpaceUrl + "" class="btn" style="background-color:#0284c7;">Accéder à mon espace client</a>
+        <a href="${clientSpaceUrl}" class="btn" style="background-color:#0284c7;">Accéder à mon espace client</a>
       </div>
 
       <p>Ces éléments me permettront d'étudier votre dossier en amont afin de personnaliser pleinement notre séance.</p>
@@ -131,7 +148,7 @@ export default async function handler(req, res) {
 </body>
 </html>`;
 
-    const emailSubject = "📋 Préparation de votre séance du " + formattedDate + " à " + slot + " – VITASCIENZELAB";
+    const emailSubject = `📋 Préparation de votre séance du ${formattedDate} à ${slotToUse} – VITASCIENZELAB`;
 
     if (BREVO_KEY) {
       const emailRes = await fetch("https://api.brevo.com/v3/smtp/email", {
