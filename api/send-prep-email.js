@@ -31,13 +31,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE;
-  const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://zbavzvcnmlwbsepfsnbi.supabase.co";
   const BREVO_KEY = process.env.BREVO_API_KEY;
-
-  if (!SERVICE_KEY) {
-    return res.status(500).json({ error: "Database service key missing" });
-  }
 
   let body;
   try {
@@ -46,7 +40,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid JSON body" });
   }
 
-  const { clientName, clientEmail, patientId, rdvDate, slot, serviceTitle } = body || {};
+  const { clientName, clientEmail, patientId, rdvDate, slot } = body || {};
 
   if (!clientEmail) {
     return res.status(400).json({ error: "Champs manquants: clientEmail requis" });
@@ -54,42 +48,14 @@ export default async function handler(req, res) {
 
   const dateToUse = rdvDate || new Date().toISOString().split("T")[0];
   const slotToUse = slot || "17:00";
-  const apptId = "RDV_PREP_" + (patientId || "GUEST").slice(0, 8) + "_" + dateToUse.replace(/-/g, "") + "_" + slotToUse.replace(/:/g, "");
   const formattedDate = formatDateFr(dateToUse);
   const firstName = (clientName || "").split(" ")[0] || "Client";
 
+  // Direct questionnaire link to client ID or email (pure email notification, no appointment row created in DB)
+  const questUrl = "https://vitascienzelab.vercel.app?questionnaire=" + encodeURIComponent(patientId || clientEmail);
+  const clientSpaceUrl = "https://vitascienzelab.vercel.app";
+
   try {
-    const checkRes = await fetch(SUPABASE_URL + "/rest/v1/appointments?id=eq." + apptId, {
-      headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY }
-    });
-    const existing = checkRes.ok ? await checkRes.json() : [];
-
-    if (!Array.isArray(existing) || existing.length === 0) {
-      await fetch(SUPABASE_URL + "/rest/v1/appointments", {
-        method: "POST",
-        headers: {
-          apikey: SERVICE_KEY,
-          Authorization: "Bearer " + SERVICE_KEY,
-          "Content-Type": "application/json",
-          Prefer: "return=representation"
-        },
-        body: JSON.stringify({
-          id: apptId,
-          patient_id: patientId || null,
-          patient_name: clientName || firstName,
-          patient_email: clientEmail,
-          rdv_date: dateToUse,
-          slot: slotToUse,
-          status: "confirmed",
-          service_id: "conseil",
-          service_title: serviceTitle || "Séance de Conseil en Compléments"
-        })
-      });
-    }
-
-    const questUrl = "https://vitascienzelab.vercel.app?questionnaire=" + apptId;
-    const clientSpaceUrl = "https://vitascienzelab.vercel.app";
-
     const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -177,7 +143,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      apptId,
       formattedDate,
       message: "Email de préparation envoyé à " + clientEmail
     });
