@@ -13219,11 +13219,9 @@ function Rg({
           created_at: y.created_at
         });
       }), B(Object.values(c).filter(y => y.email && y.email.trim() !== "").sort((y, b) => (y.nom || "").localeCompare(b.nom || ""))), Y([...ue.blocked]);
-    } else Promise.all([
-      adminGet("appointments", "status=neq.archived&order=rdv_date.asc"),
-      adminGet("profiles", "select=*&order=created_at.desc"),
-      adminGet("blocked_slots", "order=blocked_date.asc")
-    ]).then(([c, y, b]) => {
+    } else fetch("/api/admin-init", { method: "POST" })
+      .then(res => res.json())
+      .then(({ appointments: c = [], profiles: y = [], blockedSlots: b = [] }) => {
       if (Array.isArray(c)) {
         R(c);
         try {
