@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   try {
     const [apptsRes, profsRes, blockedRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/appointments?status=neq.archived&order=rdv_date.asc`, { headers }),
-      fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*&order=created_at.desc`, { headers }),
+      fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,prenom,nom,tel,dob,created_at,guests&order=created_at.desc`, { headers }),
       fetch(`${SUPABASE_URL}/rest/v1/blocked_slots?order=blocked_date.asc`, { headers })
     ]);
 
