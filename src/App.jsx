@@ -16060,9 +16060,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
           };
           return getSortName(a).localeCompare(getSortName(b));
         }).map(c => {
-          let y = p.filter(H => H.patient_id === c.id),
-            b = y.filter(H => !at(H) && H.status === "confirmed").sort((H, F) => H.rdv_date.localeCompare(F.date))[0],
-            _ = y.filter(H => at(H)).sort((H, F) => F.date.localeCompare(H.rdv_date))[0],
+          let y = p.filter(H => H.patient_id === c.id || (c.email && H.patient_email === c.email)),
+            b = y.filter(H => !at(H) && H.status === "confirmed").sort((H, F) => (H.rdv_date || "").localeCompare(F.rdv_date || ""))[0],
+            _ = y.filter(H => at(H)).sort((H, F) => (F.rdv_date || "").localeCompare(H.rdv_date || ""))[0],
             G = ((c.prenom || "?")[0] + (c.nom || "?")[0]).toUpperCase();
           return _jsxs("div", {
             onClick: () => Mr(c),
