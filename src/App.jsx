@@ -9137,83 +9137,115 @@ const downloadBase64File = (base64Data, filename) => {
   try {
     let cleanData = String(base64Data).trim();
     if (!cleanData.startsWith("data:")) {
+      let downloadUrl = cleanData;
+      if (cleanData.includes("/storage/v1/object/public/")) {
+        const sep = cleanData.includes("?") ? "&" : "?";
+        downloadUrl = `${cleanData}${sep}download=${encodeURIComponent(filename || "document")}`;
+      }
       const a = document.createElement("a");
-      a.href = cleanData;
+      a.href = downloadUrl;
       a.download = filename || "document";
-      a.target = "_blank";
+      a.rel = "noopener noreferrer";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       return;
     }
-    const parts = cleanData.split(";base64,");
-    if (parts.length < 2) {
-      const a = document.createElement("a");
-      a.href = cleanData;
-      a.download = filename || "document";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      return;
-    }
-    const contentType = parts[0].replace("data:", "") || "application/octet-stream";
-    let rawBase64 = parts[1].replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
-    while (rawBase64.length % 4 !== 0) {
-      rawBase64 += "=";
-    }
-    const raw = window.atob(rawBase64);
-    const rawLength = raw.length;
-    const uInt8Array = new Uint8Array(rawLength);
-    for (let i = 0; i < rawLength; ++i) {
-      uInt8Array[i] = raw.charCodeAt(i);
-    }
-    const blob = new Blob([uInt8Array], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename || "document";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    }, 2000);
-  } catch (err) {
-    console.error("Primary base64 download failed, attempting native fetch fallback:", err);
-    try {
-      fetch(base64Data)
-        .then(res => res.blob())
-        .then(blob => {
-          const url = window.URL.createObjectURL(blob);
+    fetch(cleanData)
+      .then(res => res.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || "document";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 2000);
+      })
+      .catch(() => {
+        const parts = cleanData.split(";base64,");
+        if (parts.length < 2) {
           const a = document.createElement("a");
-          a.href = url;
+          a.href = cleanData;
           a.download = filename || "document";
           document.body.appendChild(a);
           a.click();
-          setTimeout(() => {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-          }, 2000);
-        })
-        .catch(() => {
-          const win = window.open();
-          if (win) {
-            win.document.write(`<iframe src="${base64Data}" frameborder="0" style="border:0; width:100%; height:100%;" allowfullscreen></iframe>`);
-          } else {
-            window.location.href = base64Data;
-          }
-        });
-    } catch (e) {
-      alert("Erreur lors du téléchargement du fichier.");
-    }
+          document.body.removeChild(a);
+          return;
+        }
+        const contentType = parts[0].replace("data:", "") || "application/octet-stream";
+        let rawBase64 = parts[1].replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
+        while (rawBase64.length % 4 !== 0) {
+          rawBase64 += "=";
+        }
+        const raw = window.atob(rawBase64);
+        const rawLength = raw.length;
+        const uInt8Array = new Uint8Array(rawLength);
+        for (let i = 0; i < rawLength; ++i) {
+          uInt8Array[i] = raw.charCodeAt(i);
+        }
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || "document";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 2000);
+      });
+  } catch (err) {
+    console.error("Download error:", err);
+    alert("Erreur lors du téléchargement du fichier.");
   }
 };
-const compressAndReadFile = (file) => {
-  return new Promise((resolve, reject) => {
-    if (file.size > 15 * 1024 * 1024) {
-      reject(new Error(`Le fichier "${file.name}" dépasse la taille maximale autorisée (15 Mo).`));
-      return;
+const compressAndReadFile = async (file, patientId = "shared") => {
+  if (file.size > 30 * 1024 * 1024) {
+    throw new Error(`Le fichier "${file.name}" dépasse la taille maximale autorisée (30 Mo).`);
+  }
+  if (!ee) {
+    try {
+      const signRes = await fetch("/api/admin-write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "create_upload_url",
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+          patientId
+        })
+      });
+      if (signRes.ok) {
+        const signData = await signRes.json();
+        if (signData && signData.signedUrl) {
+          const uploadRes = await fetch(signData.signedUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": file.type || "application/octet-stream"
+            },
+            body: file
+          });
+          if (uploadRes.ok) {
+            return {
+              name: file.name,
+              type: file.type || "application/octet-stream",
+              size: file.size,
+              data: signData.publicUrl,
+              storage_path: signData.storagePath
+            };
+          }
+        }
+      }
+    } catch (storageErr) {
+      console.warn("Direct storage upload fallback:", storageErr);
     }
+  }
+  return new Promise((resolve, reject) => {
     const isImage = file.type.startsWith("image/");
     if (isImage) {
       const img = new Image();
@@ -9243,19 +9275,20 @@ const compressAndReadFile = (file) => {
         resolve({
           name: file.name.replace(/\.[^/.]+$/, ".jpg"),
           type: "image/jpeg",
+          size: file.size,
           data: compressedDataUrl
         });
       };
       img.onerror = () => {
         const readerRaw = new FileReader();
-        readerRaw.onload = (ev) => resolve({ name: file.name, type: file.type, data: ev.target.result });
+        readerRaw.onload = (ev) => resolve({ name: file.name, type: file.type, size: file.size, data: ev.target.result });
         readerRaw.onerror = reject;
         readerRaw.readAsDataURL(file);
       };
       reader.readAsDataURL(file);
     } else {
       const reader = new FileReader();
-      reader.onload = (e) => resolve({ name: file.name, type: file.type, data: e.target.result });
+      reader.onload = (e) => resolve({ name: file.name, type: file.type, size: file.size, data: e.target.result });
       reader.onerror = reject;
       reader.readAsDataURL(file);
     }
@@ -9937,7 +9970,7 @@ function Dg({
             O = [],
             L = [];
           try {
-            let de = await X.get("profiles", `id=eq.${M.id}`, B);
+            let de = await adminGet("profiles", `id=eq.${M.id}&select=client_files,guests`);
             Array.isArray(de) && de[0] && (O = de[0].client_files || [], L = de[0].guests || []);
           } catch {}
           // Store client JWT in activeSessionToken so Ki(j) uses it for all subsequent requests
@@ -10345,11 +10378,12 @@ function Tg({
   let [freshProfileFiles, setFreshProfileFiles] = useState(null);
   useEffect(() => {
     if (e?.id && !ee) {
-      // Do NOT use e.token for the profiles fetch — Supabase JWT access tokens are too large
-      // and PostgREST returns 431. The profiles.client_files are already loaded at login
-      // via the signIn handler (lines ~9929-9930) and passed as e.client_files.
-      // Only fetch admin_notes with anon key — RLS may allow patient to read their own notes.
-      X.get("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`, j).then(notes => {
+      adminGet("profiles", `id=eq.${e.id}&select=client_files,guests`).then(profs => {
+        if (Array.isArray(profs) && profs[0] && Array.isArray(profs[0].client_files)) {
+          setFreshProfileFiles(profs[0].client_files);
+        }
+      }).catch(() => {});
+      adminGet("admin_notes", `patient_id=eq.${e.id}&note=like.*FICHIER*`).then(notes => {
         if (Array.isArray(notes)) {
           let extracted = [];
           notes.forEach(n => {
@@ -10404,7 +10438,7 @@ function Tg({
       let C = [];
       try {
         if (ee) C = ue.appointments.filter(W => W.patient_id === e.id || W.patient_email === e.email);else {
-          let [W, le] = await Promise.all([X.get("appointments", `patient_id=eq.${e.id}&status=neq.archived&order=rdv_date.desc`, j), X.get("appointments", `patient_email=eq.${e.email}&status=neq.archived&order=rdv_date.desc`, j)]),
+          let [W, le] = await Promise.all([adminGet("appointments", `patient_id=eq.${e.id}&status=neq.archived&order=rdv_date.desc`), adminGet("appointments", `patient_email=eq.${encodeURIComponent(e.email)}&status=neq.archived&order=rdv_date.desc`)]),
             Ne = [...(Array.isArray(W) ? W : []), ...(Array.isArray(le) ? le : [])],
             De = new Set();
           C = Ne.filter(st => De.has(st.id) ? !1 : (De.add(st.id), !0)), C.sort((st, ke) => (ke.rdv_date || "").localeCompare(st.rdv_date || ""));
@@ -10604,17 +10638,17 @@ function Tg({
             onClick: async () => {
               if (!window.confirm(`Supprimer "${C}" ?`)) return;
               let le = (Oe.docs || []).filter((st, ke) => ke !== W),
-                Ne = (Oe.docs_data || []).filter((st, ke) => ke !== W);
-              ee || (await X.patch("appointments", Oe.id, {
-                docs: le,
-                docs_data: Ne
-              }, j));
-              let De = {
-                ...Oe,
-                docs: le,
-                docs_data: Ne
-              };
+                Ne = (Oe.docs_data || []).filter((st, ke) => ke !== W),
+                De = {
+                  ...Oe,
+                  docs: le,
+                  docs_data: Ne
+                };
               Ce(De), i(st => st.map(ke => ke.id === Oe.id ? De : ke));
+              ee || (await adminPatch("appointments", Oe.id, {
+                docs: le,
+                docs_data: Ne
+              }).catch(() => {}));
             },
             style: {
               background: "#FCE4EC",
@@ -10636,29 +10670,31 @@ function Tg({
           style: {
             display: "none"
           },
-          onChange: C => {
-            let W = Array.from(C.target.files),
-              le = {
-                ...Oe
-              },
-              Ne = W.length;
-            W.forEach(De => {
-              let st = new FileReader();
-              st.onload = async ke => {
-                le = {
-                  ...le,
-                  docs: [...(le.docs || []), De.name],
-                  docs_data: [...(le.docs_data || []), {
-                    name: De.name,
-                    type: De.type,
-                    data: ke.target.result
-                  }]
-                }, Ne--, Ne === 0 && (ee || (await X.patch("appointments", Oe.id, {
-                  docs: le.docs,
-                  docs_data: le.docs_data
-                }, j)), Ce(le), i(vl => vl.map(Ut => Ut.id === Oe.id ? le : Ut)));
-              }, st.readAsDataURL(De);
-            }), C.target.value = "";
+          onChange: async C => {
+            let W = Array.from(C.target.files);
+            if (!W.length) return;
+            try {
+              let processed = await Promise.all(W.map(De => compressAndReadFile(De, e?.id || "client")));
+              let le = {
+                ...Oe,
+                docs: [...(Oe.docs || []), ...processed.map(f => f.name)],
+                docs_data: [...(Oe.docs_data || []), ...processed.map(f => ({
+                  name: f.name,
+                  type: f.type,
+                  data: f.data,
+                  storage_path: f.storage_path || null
+                }))]
+              };
+              Ce(le), i(vl => vl.map(Ut => Ut.id === Oe.id ? le : Ut));
+              ee || (await adminPatch("appointments", Oe.id, {
+                docs: le.docs,
+                docs_data: le.docs_data
+              }).catch(() => {}));
+            } catch (err) {
+              alert(err.message || "Erreur lors de l'envoi du document.");
+            } finally {
+              C.target.value = "";
+            }
           }
         }), _jsx("button", {
           onClick: () => yl.current?.click(),
@@ -11221,12 +11257,13 @@ function Tg({
             onClick: async () => {
               if (!window.confirm(`Retirer "${C.name}" ?`)) return;
               let le = (e.guests || []).filter((Ne, De) => De !== W);
-              ee || (await X.patch("profiles", e.id, {
-                guests: le
-              }, j)), t({
+              t({
                 ...e,
                 guests: le
               });
+              ee || (await adminPatch("profiles", e.id, {
+                guests: le
+              }).catch(() => {}));
             },
             style: {
               background: "#FCE4EC",
@@ -11254,12 +11291,13 @@ function Tg({
                 let W = [...(e.guests || []), {
                   name: r.trim()
                 }];
-                ee || (await X.patch("profiles", e.id, {
-                  guests: W
-                }, j)), t({
+                t({
                   ...e,
                   guests: W
                 }), v("");
+                ee || (await adminPatch("profiles", e.id, {
+                  guests: W
+                }).catch(() => {}));
               }
             }
           }), _jsx(ze, {
@@ -11268,12 +11306,13 @@ function Tg({
               let C = [...(e.guests || []), {
                 name: r.trim()
               }];
-              ee || (await X.patch("profiles", e.id, {
-                guests: C
-              }, j)), t({
+              t({
                 ...e,
                 guests: C
               }), v("");
+              ee || (await adminPatch("profiles", e.id, {
+                guests: C
+              }).catch(() => {}));
             },
             style: {
               padding: "10px 16px",
@@ -11473,18 +11512,30 @@ function Tg({
                   _jsx("button", {
                     onClick: async () => {
                       if (!window.confirm(`Supprimer "${C.name}" ?`)) return;
-                      const remainingFiles = (e.client_files || []).filter(f => f.name !== C.name);
+                      const targetLower = (C.name || "").trim().toLowerCase();
+                      const filterFn = f => f && (f.name || "").trim().toLowerCase() !== targetLower;
+                      const remainingFiles = (e.client_files || []).filter(filterFn);
+                      // Optimistic instant removal across all client file states (0ms)
+                      t({
+                        ...e,
+                        client_files: remainingFiles
+                      });
+                      setFreshProfileFiles(prev => (prev || []).filter(filterFn));
+                      setClientNoteFiles(prev => (prev || []).filter(filterFn));
                       try {
                         if (!ee) {
-                          await X.patch("profiles", e.id, {
-                            client_files: remainingFiles
-                          }, j);
+                          await fetch("/api/admin-write", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              operation: "delete_client_file",
+                              patientId: e.id,
+                              fileName: C.name,
+                              noteId: C._note_id || null,
+                              storagePath: C.storage_path || null
+                            })
+                          });
                         }
-                        t({
-                          ...e,
-                          client_files: remainingFiles
-                        });
-                        setFreshProfileFiles(remainingFiles);
                       } catch (err) {
                         console.error("Error deleting file:", err);
                       }
@@ -11516,37 +11567,46 @@ function Tg({
               const selectedFiles = Array.from(c.target.files);
               if (selectedFiles.length === 0) return;
               try {
-                const processedFiles = await Promise.all(selectedFiles.map(file => compressAndReadFile(file)));
+                const processedFiles = await Promise.all(selectedFiles.map(file => compressAndReadFile(file, e.id)));
                 const newFilesList = processedFiles.map(f => ({
                   name: f.name,
                   type: f.type,
+                  size: f.size || 0,
                   data: f.data,
+                  storage_path: f.storage_path || null,
                   date: new Date().toLocaleDateString("fr-FR"),
                   uploaded_by: "client",
                   is_new_for_admin: true
                 }));
-                const currentFiles = e.client_files || [];
+                const newNamesSet = new Set(newFilesList.map(f => (f.name || "").trim().toLowerCase()));
+                const currentFiles = (e.client_files || []).filter(f => f && !newNamesSet.has((f.name || "").trim().toLowerCase()));
                 const finalFiles = [...currentFiles, ...newFilesList];
 
+                // Optimistic UI update immediately
+                t({
+                  ...e,
+                  client_files: finalFiles
+                });
+                setFreshProfileFiles(finalFiles);
+
                 if (!ee) {
-                  let patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, j).catch(() => null);
-                  if (!patchRes || patchRes.error || patchRes.code) {
-                    patchRes = await X.patch("profiles", e.id, { client_files: finalFiles }, j).catch(() => null);
-                  }
-                  if (patchRes && (patchRes.error || patchRes.code)) {
-                    console.error("Supabase client patch failed:", patchRes);
+                  const saveRes = await fetch("/api/admin-write", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      operation: "append_client_files",
+                      patientId: e.id,
+                      newFiles: newFilesList,
+                      notePrefix: "📁 FICHIER CLIENT — "
+                    })
+                  }).then(r => r.json()).catch(() => null);
+
+                  if (!saveRes || saveRes.error) {
+                    console.error("Supabase client append_client_files failed:", saveRes);
                     alert("Erreur lors de la sauvegarde du fichier.");
                     return;
                   }
 
-                  for (let fileObj of newFilesList) {
-                    const noteText = `📁 FICHIER CLIENT — ${JSON.stringify(fileObj)}`;
-                    await X.post("admin_notes", {
-                      patient_id: e.id,
-                      note: noteText,
-                      created_at: new Date().toISOString()
-                    }, j).catch(err => console.error("Post file note error:", err));
-                  }
                   const clientFullName = `${e.prenom || ''} ${e.nom || ''}`.trim() || e.email;
                   const uploadedNames = newFilesList.map(f => f.name).join(", ");
                   X.post("admin_notes", {
@@ -11556,11 +11616,6 @@ function Tg({
                   }, j).catch(() => {});
                 }
 
-                t({
-                  ...e,
-                  client_files: finalFiles
-                });
-                setFreshProfileFiles(finalFiles);
                 alert(`✅ ${newFilesList.length} fichier(s) déposé(s) avec succès !`);
               } catch (err) {
                 console.error("Client upload error:", err);
@@ -11694,10 +11749,10 @@ function Bg({
             throw new Error(re.message || "Database insert failed");
           }
           try {
-            await X.patch("appointments", x.id, {
+            await adminPatch("appointments", x.id, {
               supplements: x.supplements || [],
               docs_data: x.docs_data || []
-            }, j);
+            });
           } catch (wt) {
             console.log("Extra fields not saved:", wt);
           }
@@ -11716,7 +11771,7 @@ function Bg({
         jn(x.patient_email, "\u{1F4CB} Pr\xE9parez votre s\xE9ance VITASCIENZELAB (optionnel)", `<html><body style="font-family:Arial,sans-serif;padding:20px;background:#f4f4f4"><div style="max-width:500px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:linear-gradient(135deg,#003891,#1565C0);padding:24px;text-align:center"><div style="font-size:28px">\u2697\uFE0F</div><div style="font-size:18px;color:#fff;font-weight:700;margin-top:6px">VITASCIENZELAB</div></div><div style="padding:24px"><h2 style="color:#1A237E;font-size:16px;margin-bottom:12px">\u{1F4CB} Questionnaire optionnel de pr\xE9paration</h2><p style="color:#546E7A;font-size:13px;line-height:1.7;margin-bottom:16px">Bonjour <strong>${x.patient_name?.split(" ")[0] || ""}</strong>,<br/>Pour pr\xE9parer au mieux votre s\xE9ance du <strong>${vt(x.rdv_date)}</strong> \xE0 <strong>${x.slot}</strong>, vous pouvez r\xE9pondre \xE0 quelques questions sur vos habitudes de vie. C'est <strong>enti\xE8rement facultatif</strong>.</p><div style="background:#FFF8E1;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#E65100">\u2139\uFE0F Ces informations servent uniquement \xE0 adapter notre s\xE9lection de compl\xE9ments. Aucun acte m\xE9dical.</div><a href="${U}" style="display:block;text-align:center;background:#1565C0;color:#fff;border-radius:10px;padding:12px;font-size:14px;font-weight:700;text-decoration:none;margin-bottom:12px">\u{1F4CB} Remplir le questionnaire (5 min)</a><p style="font-size:10px;color:#90A4AE;text-align:center">VITASCIENZELAB \xB7 SIRET 841 057 730 00019</p></div></div></body></html>`).catch(() => {});
       }
       if (!ee && e?.id && e.id.length > 20) try {
-        let U = await X.get("profiles", `id=eq.${e.id}`, j);
+        let U = await adminGet("profiles", `id=eq.${e.id}&select=client_docs,all_supplements`);
         if (Array.isArray(U) && U[0]) {
           let re = U[0].client_docs || [],
             rt = (x.docs_data || []).map(wn => ({
@@ -11731,10 +11786,10 @@ function Bg({
               from_rdv: x.rdv_date,
               patient_name: x.patient_name || ""
             }));
-          await X.patch("profiles", e.id, {
+          await adminPatch("profiles", e.id, {
             client_docs: [...re, ...rt],
             all_supplements: [...wt, ...bl]
-          }, j);
+          });
         }
       } catch (U) {
         console.error("Profile docs save:", U);
@@ -11977,9 +12032,9 @@ function Bg({
                     le(x.error?.message || x.msg || "Erreur");
                     return;
                   }
-                  x.user?.id && (await X.patch("appointments", Ce.id, {
+                  x.user?.id && (await adminPatch("appointments", Ce.id, {
                     patient_id: x.user.id
-                  }, j)), Wt("done");
+                  }).catch(() => {})), Wt("done");
                 } catch {
                   le("Erreur r\xE9seau");
                 }
@@ -12461,18 +12516,17 @@ function Bg({
           }), _jsx("input", {
             type: "file",
             ref: vl,
-            onChange: x => {
-              Array.from(x.target.files).forEach(re => {
-                let rt = new FileReader();
-                rt.onload = wt => {
-                  E(bl => [...bl, {
-                    name: re.name,
-                    size: re.size,
-                    type: re.type,
-                    data: wt.target.result
-                  }]);
-                }, rt.readAsDataURL(re);
-              }), vl.current.value = "";
+            onChange: async x => {
+              let files = Array.from(x.target.files);
+              if (!files.length) return;
+              try {
+                let processed = await Promise.all(files.map(re => compressAndReadFile(re, e?.id || "booking")));
+                E(bl => [...bl, ...processed]);
+              } catch (err) {
+                alert(err.message || "Erreur lors de l'ajout du document.");
+              } finally {
+                if (vl.current) vl.current.value = "";
+              }
             },
             multiple: !0,
             accept: ".pdf,.jpg,.jpeg,.png,.doc,.docx",
@@ -13345,9 +13399,9 @@ function Rg({
                     $e = new Date(`${D.rdv_date}T${String($).padStart(2, "0")}:${String(Xe).padStart(2, "0")}:00`);
                   return $e.setMinutes($e.getMinutes() + He), $e < P;
                 });
-              Ye.forEach(D => X.patch("appointments", D.id, {
+              Ye.forEach(D => adminPatch("appointments", D.id, {
                 status: "completed"
-              }, j).catch(() => {}));
+              }).catch(() => {}));
               let Ht = F.map(D => Ye.find(He => He.id === D.id) ? {
                 ...D,
                 status: "completed"
@@ -13435,7 +13489,7 @@ function Rg({
       });
     },
     Y0 = c => {
-      ee ? ue.blocked = ue.blocked.filter(y => y.id !== c) : X.del("blocked_slots", c, j), Y(y => y.filter(b => b.id !== c));
+      ee ? ue.blocked = ue.blocked.filter(y => y.id !== c) : adminDelete("blocked_slots", c).catch(() => {}), Y(y => y.filter(b => b.id !== c));
     },
     G0 = () => new Promise(c => {
       if (window.google?.accounts) {
@@ -13554,9 +13608,9 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
               console.error("Local storage sync save error:", err);
             }
             if (!ee) {
-              await X.patch("appointments", c.id, {
+              await adminPatch("appointments", c.id, {
                 gcal_event_id: gcalEventId
-              }, j).catch(err => {
+              }).catch(err => {
                 console.error("Supabase patch error:", err);
               });
             } else {
@@ -13678,42 +13732,7 @@ Toutes ses s\xE9ances et notes seront aussi supprim\xE9es.
 
 Cette action est irr\xE9versible.`)) try {
         let b = c.email.trim();
-        ee ? (ue.appointments = ue.appointments.filter(_ => _.patient_email !== b), ue.notes = ue.notes.filter(_ => _.patient_id !== c.id), ue.questionnaires = ue.questionnaires.filter(_ => _.patient_email !== b)) : (await fetch(`${Ge}/rest/v1/appointments?patient_email=eq.${encodeURIComponent(b)}`, {
-          method: "DELETE",
-          headers: {
-            apikey: j,
-            Authorization: `Bearer ${j}`,
-            Prefer: "return=minimal"
-          }
-        }), await fetch(`${Ge}/rest/v1/admin_notes?patient_id=eq.${c.id}`, {
-          method: "DELETE",
-          headers: {
-            apikey: j,
-            Authorization: `Bearer ${j}`,
-            Prefer: "return=minimal"
-          }
-        }), await fetch(`${Ge}/rest/v1/questionnaires?patient_email=eq.${encodeURIComponent(b)}`, {
-          method: "DELETE",
-          headers: {
-            apikey: j,
-            Authorization: `Bearer ${j}`,
-            Prefer: "return=minimal"
-          }
-        }), c.id ? await fetch(`${Ge}/rest/v1/profiles?id=eq.${c.id}`, {
-          method: "DELETE",
-          headers: {
-            apikey: j,
-            Authorization: `Bearer ${j}`,
-            Prefer: "return=minimal"
-          }
-        }) : await fetch(`${Ge}/rest/v1/profiles?email=eq.${encodeURIComponent(b)}`, {
-          method: "DELETE",
-          headers: {
-            apikey: j,
-            Authorization: `Bearer ${j}`,
-            Prefer: "return=minimal"
-          }
-        })), R(_ => _.filter(G => G.patient_email !== b)), B(_ => _.filter(G => G.email !== b)), Yl(_ => [{
+        R(_ => _.filter(G => G.patient_email !== b)), B(_ => _.filter(G => G.email !== b)), Yl(_ => [{
           type: "patient_deleted",
           msg: `Client supprim\xE9 : ${y}`,
           detail: b,
@@ -13723,6 +13742,21 @@ Cette action est irr\xE9versible.`)) try {
           }),
           icon: "\u{1F5D1}\uFE0F"
         }, ..._.slice(0, 49)]), E === "fiche" && (g("clients"), L(null));
+        if (ee) {
+          ue.appointments = ue.appointments.filter(_ => _.patient_email !== b);
+          ue.notes = ue.notes.filter(_ => _.patient_id !== c.id);
+          ue.questionnaires = ue.questionnaires.filter(_ => _.patient_email !== b);
+        } else {
+          await fetch("/api/admin-write", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operation: "delete_patient",
+              patientId: c.id || null,
+              email: b
+            })
+          });
+        }
       } catch (b) {
         console.error("Erreur suppression patient:", b), alert("Erreur lors de la suppression. R\xE9essayez.");
       }
@@ -16151,7 +16185,8 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                     children: "\u{1F4CB} Fiche admin"
                   }),
                   _jsx("button", {
-                    onClick: () => {
+                    onClick: ev => {
+                      ev.stopPropagation();
                       setPrepClient(c.id);
                       if (c.email) setPrepClient(c.id);
                       g("mail_prep");
@@ -16561,7 +16596,8 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                 }), _jsx("button", {
                   onClick: async H => {
                     if (H.stopPropagation(), !!window.confirm("Supprimer ce formulaire d\xE9finitivement ?")) try {
-                      ee || (await X.del("questionnaires", c.id, j)), qt(F => F.filter((N, K) => K !== y)), en(-1);
+                      qt(F => F.filter((N, K) => K !== y)), en(-1);
+                      ee || (await adminDelete("questionnaires", c.id).catch(() => {}));
                     } catch (F) {
                       console.error(F);
                     }
@@ -17069,57 +17105,75 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       onChange: async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = async (evt) => {
-                          const b64Data = evt.target.result;
-                          const updatedDoc = { ...c, data: b64Data, date: new Date().toLocaleDateString("fr-FR") };
+                        try {
+                          const processed = await compressAndReadFile(file, O.id);
+                          const updatedDoc = {
+                            ...c,
+                            data: processed.data,
+                            storage_path: processed.storage_path,
+                            date: new Date().toLocaleDateString("fr-FR")
+                          };
                           let updatedList = (O.client_files || []).map(f => f.name === c.name ? updatedDoc : f);
                           if (!updatedList.some(f => f.name === c.name)) updatedList.push(updatedDoc);
-                          await adminPatch("profiles", O.id, { client_files: updatedList });
                           L(prev => ({ ...prev, client_files: updatedList }));
                           B(prev => prev.map(p => p.id === O.id ? { ...p, client_files: updatedList } : p));
-                        };
-                        reader.readAsDataURL(file);
+                          if (!ee) {
+                            await fetch("/api/admin-write", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                operation: "append_client_files",
+                                patientId: O.id,
+                                newFiles: [updatedDoc],
+                                replaceByName: true
+                              })
+                            });
+                          }
+                        } catch (err) {
+                          alert(err.message || "Erreur lors de l'ajout du PDF.");
+                        } finally {
+                          e.target.value = "";
+                        }
                       }
                     })
                   ]
                 }), _jsx("button", {
                   onClick: async () => {
                     if (!window.confirm(`Supprimer "${c.name}" du dossier ?`)) return;
-                    try {
-                      // Delete ALL admin_notes containing this file name for this patient
-                      // (covers both _note_id cases and files loaded from profiles.client_files)
-                      let notesToDelete = Array.isArray(Oe) ? Oe.filter(n => {
-                        if (!n.note || !n.note.includes("FICHIER")) return false;
-                        try {
-                          let sIdx = n.note.indexOf("{");
-                          let eIdx = n.note.lastIndexOf("}");
-                          if (sIdx === -1 || eIdx === -1) return false;
-                          let obj = JSON.parse(n.note.substring(sIdx, eIdx + 1));
-                          return obj.name === c.name;
-                        } catch(_) { return false; }
-                      }) : [];
+                    const targetNameLower = String(c.name || "").trim().toLowerCase();
+                    // 1. Optimistic immediate UI update (instantaneous removal)
+                    let b = (O.client_files || []).filter(f => String(f.name || "").trim().toLowerCase() !== targetNameLower);
+                    L(_ => ({ ..._, client_files: b }));
+                    B(_ => _.map(G => G.id === O.id ? { ...G, client_files: b } : G));
+                    Ce(prev => Array.isArray(prev) ? prev.filter(n => {
+                      if (c._note_id && n.id === c._note_id) return false;
+                      if (!n.note || !n.note.includes("FICHIER")) return true;
+                      try {
+                        let sIdx = n.note.indexOf("{");
+                        let eIdx = n.note.lastIndexOf("}");
+                        if (sIdx === -1 || eIdx === -1) return true;
+                        let obj = JSON.parse(n.note.substring(sIdx, eIdx + 1));
+                        return String(obj.name || "").trim().toLowerCase() !== targetNameLower;
+                      } catch (_) { return true; }
+                    }) : []);
 
-                      // Also check if there's a note_id directly on the file
-                      if (c._note_id && !notesToDelete.find(n => n.id === c._note_id)) {
-                        notesToDelete.push({ id: c._note_id });
+                    // 2. Server-side atomic cleanup (profiles + admin_notes + Supabase Storage)
+                    if (!ee) {
+                      try {
+                        await fetch("/api/admin-write", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            operation: "delete_client_file",
+                            patientId: O.id,
+                            fileName: c.name,
+                            noteId: c._note_id || null,
+                            storagePath: c.storage_path || null
+                          })
+                        });
+                      } catch (err) {
+                        console.error("Delete file error:", err);
                       }
-
-                      for (let note of notesToDelete) {
-                        await adminDelete("admin_notes", note.id);
-                      }
-
-                      // Update Oe state to remove deleted notes
-                      Ce(prev => Array.isArray(prev) ? prev.filter(n => !notesToDelete.find(d => d.id === n.id)) : []);
-
-                      // Remove from profiles.client_files
-                      let b = (O.client_files || []).filter(f => f.name !== c.name);
-                      if (!ee) await adminPatch("profiles", O.id, { client_files: b });
-                      L(_ => ({ ..._, client_files: b }));
-                      B(_ => _.map(G => G.id === O.id ? { ...G, client_files: b } : G));
-                    } catch (err) {
-                      console.error("Delete file error:", err);
-                      alert("Erreur lors de la suppression.");
                     }
                   },
                   style: {
@@ -17147,28 +17201,40 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
               const selectedFiles = Array.from(c.target.files);
               if (selectedFiles.length === 0) return;
               try {
-                const processedFiles = await Promise.all(selectedFiles.map(file => compressAndReadFile(file)));
+                const processedFiles = await Promise.all(selectedFiles.map(file => compressAndReadFile(file, O.id)));
                 const newFilesList = processedFiles.map(f => ({
                   name: f.name,
                   type: f.type,
                   data: f.data,
+                  storage_path: f.storage_path || null,
                   date: new Date().toLocaleDateString("fr-FR"),
                   uploaded_by: "admin"
                 }));
-                const currentFiles = O.client_files || [];
+                const newNamesSet = new Set(newFilesList.map(f => (f.name || "").trim().toLowerCase()));
+                const currentFiles = (O.client_files || []).filter(f => f && !newNamesSet.has((f.name || "").trim().toLowerCase()));
                 const finalFiles = [...currentFiles, ...newFilesList];
 
+                // Immediate UI update
+                L(N => ({
+                  ...N,
+                  client_files: finalFiles
+                }));
+                B(N => N.map(K => K.id === O.id ? {
+                  ...K,
+                  client_files: finalFiles
+                } : K));
+
                 if (!ee) {
-                  // Save files permanently into profiles.client_files so clients can read them (admin_notes is blocked by RLS for clients)
-                  await adminPatch("profiles", O.id, { client_files: finalFiles });
-                  for (let fileObj of newFilesList) {
-                    const noteText = `📁 FICHIER ADMIN — ${JSON.stringify(fileObj)}`;
-                    await X.post("admin_notes", {
-                      patient_id: O.id,
-                      note: noteText,
-                      created_at: new Date().toISOString()
-                    }, j).catch(err => console.error("Post admin file note error:", err));
-                  }
+                  await fetch("/api/admin-write", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      operation: "append_client_files",
+                      patientId: O.id,
+                      newFiles: newFilesList,
+                      notePrefix: "📁 FICHIER ADMIN — "
+                    })
+                  });
                   if (O.email && O.email !== "—" && O.email.includes("@")) {
                     const emailSubject = "📄 Nouveau document disponible — VITASCIENZELAB";
                     const emailHtml = `<div style="font-family:sans-serif;padding:20px;max-width:500px">
@@ -17187,17 +17253,9 @@ Les documents transmis seront conserv\xE9s sur la fiche client.`)) try {
                       <hr style="border:none;border-top:1px solid #ECEFF1;margin:20px 0;"/>
                       <p style="color:#90A4AE;font-size:11px">VITASCIENZELAB &middot; Herboristerie Champenoise</p>
                     </div>`;
-                    await jn(O.email, emailSubject, emailHtml).catch(() => {});
+                    jn(O.email, emailSubject, emailHtml).catch(() => {});
                   }
                 }
-                L(N => ({
-                  ...N,
-                  client_files: finalFiles
-                }));
-                B(N => N.map(K => K.id === O.id ? {
-                  ...K,
-                  client_files: finalFiles
-                } : K));
                 alert(`✅ ${newFilesList.length} fichier(s) déposé(s) avec succès !`);
               } catch (err) {
                 console.error("Admin upload error:", err);
