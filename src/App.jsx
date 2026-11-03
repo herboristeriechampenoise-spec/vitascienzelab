@@ -8757,6 +8757,24 @@ const k0 = on((bv, N0) => {
 });
 const Ge = import.meta.env.VITE_SUPABASE_URL || "https://zbavzvcnmlwbsepfsnbi.supabase.co";
 const j = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiYXZ6dmNubWx3YnNlcGZzbmJpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNzE1MzEsImV4cCI6MjA5Mjk0NzUzMX0.yn8SfqytABe0DxjMGgJMK-ZFo3yrDDbn4Lx-b-uGz0I";
+const adminPost = async (table, data) => {
+  try {
+    const res = await fetch("/api/admin-write", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operation: "post", table, data })
+    });
+    if (res.ok) {
+      return await res.json().catch(() => ({ ok: true }));
+    }
+    const errBody = await res.json().catch(() => ({ error: "HTTP " + res.status }));
+    return { error: errBody.error || "Database insert failed", status: res.status };
+  } catch (err) {
+    console.error("adminPost error:", err);
+    return { error: err.message || "Network error" };
+  }
+};
+
 const adminPatch = async (table, id, data) => {
   try {
     const res = await fetch("/api/admin-write", {
@@ -10510,11 +10528,11 @@ function Tg({
         <p>Votre s\xE9ance du <strong>${vt(C.rdv_date)}</strong> \xE0 <strong>${C.slot}</strong> a bien \xE9t\xE9 annul\xE9e.</p>
         <p style="color:#546E7A">Pour reprendre rendez-vous : <a href="https://vitascienzelab.vercel.app">vitascienzelab.vercel.app</a></p>
         <p style="font-size:11px;color:#90A4AE;margin-top:20px">VITASCIENZELAB \u2013 SIRET : 841 057 730 00019</p>
-      </div>`), ee || X.post("admin_notes", {
+      </div>`), ee || adminPost("admin_notes", {
           patient_id: e?.id || "unknown",
           note: `\u{1F4F1} ANNULATION CLIENT \u2014 ${e?.prenom || ""} ${e?.nom || ""} (${e?.email}) a annul\xE9 sa s\xE9ance du ${Ke(C.rdv_date)} \xE0 ${C.slot} (${C.service_title}).`,
           created_at: new Date().toISOString()
-        }, j);
+        });
       }
     },
     [B, M] = useState(null),
@@ -11609,11 +11627,11 @@ function Tg({
 
                   const clientFullName = `${e.prenom || ''} ${e.nom || ''}`.trim() || e.email;
                   const uploadedNames = newFilesList.map(f => f.name).join(", ");
-                  X.post("admin_notes", {
+                  adminPost("admin_notes", {
                     patient_id: e.id,
                     note: `📁 NOUVEAU FICHIER CLIENT — ${clientFullName} a déposé le(s) fichier(s) : ${uploadedNames}`,
                     created_at: new Date().toISOString()
-                  }, j).catch(() => {});
+                  }).catch(() => {});
                 }
 
                 alert(`✅ ${newFilesList.length} fichier(s) déposé(s) avec succès !`);
@@ -11728,7 +11746,7 @@ function Bg({
         })),
         supplements: B.supplements || [],
         reminder_sent: !1,
-        created_at: it(0)
+        created_at: new Date().toISOString()
       };
       try {
         if (ee) ue.appointments.push(x), Object.keys(R).length > 0 && ue.questionnaires.push({
@@ -11743,10 +11761,10 @@ function Bg({
             ...x
           };
           delete U.supplements, delete U.docs_data;
-          let re = await X.post("appointments", U, j);
+          let re = await adminPost("appointments", U);
           console.log("Save result:", re);
-          if (re && (re.error || re.code || re.message)) {
-            throw new Error(re.message || "Database insert failed");
+          if (!re || re.error || re.code) {
+            throw new Error(re?.error || re?.message || "Database insert failed");
           }
           try {
             await adminPatch("appointments", x.id, {
@@ -11756,17 +11774,26 @@ function Bg({
           } catch (wt) {
             console.log("Extra fields not saved:", wt);
           }
+          if (Object.keys(R).length > 0) {
+            await adminPost("questionnaires", {
+              appointment_id: x.id,
+              patient_id: e?.id || null,
+              patient_email: x.patient_email,
+              responses: R,
+              created_at: new Date().toISOString()
+            }).catch(() => {});
+          }
         }
       } catch (U) {
-        console.error("Booking error:", U), alert("Erreur r\xE9seau. Veuillez r\xE9essayer."), Oe(!1);
+        console.error("Booking error:", U), alert("Erreur r\xE9seau lors de l'enregistrement du rendez-vous. Veuillez r\xE9essayer."), Oe(!1);
         return;
       }
       if (jn(x.patient_email, "\u2705 Votre s\xE9ance est confirm\xE9e \u2014 VITASCIENZELAB", Ji(x, "confirm")).catch(U => console.error("Email confirm error:", U)), !ee) {
-        X.post("admin_notes", {
+        adminPost("admin_notes", {
           patient_id: e?.id || "unknown",
           note: `\u{1F4F1} R\xC9SERVATION CLIENT \u2014 ${x.patient_name} (${x.patient_email}) a r\xE9serv\xE9 : ${x.service_title} le ${Ke(x.rdv_date)} \xE0 ${x.slot}.`,
           created_at: new Date().toISOString()
-        }, j).catch(() => {});
+        }).catch(() => {});
         let U = `https://vitascienzelab.vercel.app?questionnaire=${x.id}`;
         jn(x.patient_email, "\u{1F4CB} Pr\xE9parez votre s\xE9ance VITASCIENZELAB (optionnel)", `<html><body style="font-family:Arial,sans-serif;padding:20px;background:#f4f4f4"><div style="max-width:500px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:linear-gradient(135deg,#003891,#1565C0);padding:24px;text-align:center"><div style="font-size:28px">\u2697\uFE0F</div><div style="font-size:18px;color:#fff;font-weight:700;margin-top:6px">VITASCIENZELAB</div></div><div style="padding:24px"><h2 style="color:#1A237E;font-size:16px;margin-bottom:12px">\u{1F4CB} Questionnaire optionnel de pr\xE9paration</h2><p style="color:#546E7A;font-size:13px;line-height:1.7;margin-bottom:16px">Bonjour <strong>${x.patient_name?.split(" ")[0] || ""}</strong>,<br/>Pour pr\xE9parer au mieux votre s\xE9ance du <strong>${vt(x.rdv_date)}</strong> \xE0 <strong>${x.slot}</strong>, vous pouvez r\xE9pondre \xE0 quelques questions sur vos habitudes de vie. C'est <strong>enti\xE8rement facultatif</strong>.</p><div style="background:#FFF8E1;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#E65100">\u2139\uFE0F Ces informations servent uniquement \xE0 adapter notre s\xE9lection de compl\xE9ments. Aucun acte m\xE9dical.</div><a href="${U}" style="display:block;text-align:center;background:#1565C0;color:#fff;border-radius:10px;padding:12px;font-size:14px;font-weight:700;text-decoration:none;margin-bottom:12px">\u{1F4CB} Remplir le questionnaire (5 min)</a><p style="font-size:10px;color:#90A4AE;text-align:center">VITASCIENZELAB \xB7 SIRET 841 057 730 00019</p></div></div></body></html>`).catch(() => {});
       }
@@ -13333,15 +13360,7 @@ function Rg({
       });
       let H = Object.values(_).filter(N => N.prenom || N.nom || N.email).sort((N, K) => (N.nom || N.email || "").localeCompare(K.nom || K.email || ""));
       B(H);
-      let F = new Date(Date.now() - 48 * 3600 * 1e3).toISOString();
-      return fetch(`${Ge}/rest/v1/admin_notes?created_at=lt.${F}`, {
-        method: "DELETE",
-        headers: {
-          apikey: j,
-          Authorization: `Bearer ${j}`,
-          Prefer: "return=minimal"
-        }
-      }).catch(() => {}).then(() => X.get("admin_notes", `created_at=gte.${F}&order=created_at.desc&limit=100`, j));
+      return adminGet("admin_notes", "note=not.like.*FICHIER%20ADMIN*&note=not.like.*FICHIER%20CLIENT*&order=created_at.desc&limit=100");
     }).then(c => {
       if (Array.isArray(c)) {
         let y = c.filter(b => b.note && (b.note.includes("\u{1F4F1}") || b.note.includes("\u270F\uFE0F") || b.note.includes("\u{1F4E7}") || b.note.includes("\u{1F5D1}"))).map(b => ({
@@ -13422,9 +13441,9 @@ function Rg({
         id: Ln(),
         patient_id: O.id,
         note: Wt,
-        created_at: it(0)
+        created_at: new Date().toISOString()
       };
-      ee ? ue.notes.push(c) : await X.post("admin_notes", c, j), Ce(y => [c, ...y]), It("");
+      ee ? ue.notes.push(c) : await adminPost("admin_notes", c), Ce(y => [c, ...y]), It("");
     },
     Mu = async c => {
       if (await jn(c.patient_email, "\u23F0 Rappel \u2014 Votre s\xE9ance VITASCIENZELAB est dans 48h", Ji(c, "48h")), ee) {
@@ -13471,9 +13490,9 @@ function Rg({
         ...c,
         id: Ln()
       }]);else {
-        let y = await X.post("blocked_slots", c, j);
-        if (y?.code) {
-          alert("Erreur: " + (y.message || JSON.stringify(y)));
+        let y = await adminPost("blocked_slots", c);
+        if (y?.error || y?.code) {
+          alert("Erreur: " + (y.error || y.message || JSON.stringify(y)));
           return;
         }
         let b = Array.isArray(y) ? y[0] : y;
@@ -13652,13 +13671,14 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
       let c = {};
       if (ie.prenom.trim() || (c.prenom = "Requis"), ie.nom.trim() || (c.nom = "Requis"), ie.rdv_date || (c.rdv_date = "Requis"), ie.slot || (c.slot = "Requis"), !ie.email.match(/^[^@]+@[^@]+\.[^@]+$/) && ie.email && (c.email = "Email invalide"), w0(c), Object.keys(c).length > 0) return;
       Rr(!0);
-      let y = $l.find(_ => _.id === ie.service_id),
+      let matchedProf = ie.email ? w.find(_ => _.email && _.email.toLowerCase() === ie.email.trim().toLowerCase() && _.id && !_.id.includes("@")) : null,
+        y = $l.find(_ => _.id === ie.service_id),
         b = {
           id: ed(),
-          patient_id: null,
-          patient_name: `${ie.prenom} ${ie.nom}`,
-          patient_email: ie.email || "\u2014",
-          patient_tel: ie.tel || "\u2014",
+          patient_id: matchedProf?.id || null,
+          patient_name: `${ie.prenom.trim()} ${ie.nom.trim()}`,
+          patient_email: ie.email ? ie.email.trim() : "\u2014",
+          patient_tel: ie.tel ? ie.tel.trim() : "\u2014",
           service_id: y.id,
           service_title: y.title,
           service_icon: y.icon,
@@ -13679,16 +13699,26 @@ Secr\xE9tariat VITASCIENZELAB \u2013 Herboristerie Champenoise`,
             ...b
           };
           delete _.docs_data;
-          let G = await X.post("appointments", _, j);
-          (G?.error || G?.code) && console.error("Erreur Supabase manual RDV:", G);
+          let G = await adminPost("appointments", _);
+          if (!G || G.error || G.code) {
+            console.error("Erreur Supabase manual RDV:", G);
+            alert("❌ Erreur lors de l'enregistrement du rendez-vous dans la base de données : " + (G?.error || G?.message || "Veuillez réessayer."));
+            Rr(!1);
+            return;
+          }
+          adminPost("admin_notes", {
+            patient_id: b.patient_id || b.patient_email || "admin",
+            note: `\u270F\uFE0F S\xC9ANCE AJOUT\xC9E \u2014 ${b.patient_name} (${b.patient_email}) : ${b.service_title} le ${Ke(b.rdv_date)} \xE0 ${b.slot}.`,
+            created_at: new Date().toISOString()
+          }).catch(() => {});
         }
-        if (R(_ => [..._, b]), !w.find(_ => _.email === b.patient_email)) {
+        if (R(_ => [..._, b]), !w.find(_ => _.email && _.email.toLowerCase() === b.patient_email.toLowerCase())) {
           let _ = {
             id: b.patient_id || b.patient_email,
             email: b.patient_email,
-            prenom: ie.prenom,
-            nom: ie.nom,
-            tel: ie.tel,
+            prenom: ie.prenom.trim(),
+            nom: ie.nom.trim(),
+            tel: ie.tel.trim(),
             created_at: new Date().toISOString(),
             has_account: !1
           };
