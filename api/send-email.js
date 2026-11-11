@@ -4,9 +4,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { to, subject, htmlContent } = req.body;
+  // Protection contre l'utilisation abusive externe hors application VitaScienzeLab
+  const origin = String(req.headers.origin || req.headers.referer || "");
+  if (origin && !origin.includes("vitascienzelab") && !origin.includes("localhost") && !origin.includes("127.0.0.1")) {
+    return res.status(403).json({ error: "Forbidden origin" });
+  }
 
-  if (!to || !subject || !htmlContent) {
+  let body;
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  } catch {
+    return res.status(400).json({ error: "Corps JSON invalide" });
+  }
+
+  const { to, subject, htmlContent } = body || {};
+  const cleanTo = String(to || "").trim();
+
+  if (!cleanTo || cleanTo === "—" || !cleanTo.includes("@")) {
+    return res.status(200).json({ success: true, skipped: true });
+  }
+
+  if (!subject || !htmlContent) {
     return res.status(400).json({ error: "Paramètres manquants" });
   }
 
@@ -29,7 +47,7 @@ export default async function handler(req, res) {
           name: "VITASCIENZELAB – Herboristerie Champenoise",
           email: "herboristeriechampenoise@gmail.com",
         },
-        to: [{ email: to }],
+        to: [{ email: cleanTo }],
         subject,
         htmlContent,
       }),

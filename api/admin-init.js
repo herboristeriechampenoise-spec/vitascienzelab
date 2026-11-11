@@ -6,6 +6,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const origin = String(req.headers.origin || req.headers.referer || '');
+  if (origin && !origin.includes('vitascienzelab') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+    return res.status(403).json({ error: 'Forbidden origin' });
+  }
+
   const SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE;
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://zbavzvcnmlwbsepfsnbi.supabase.co';
 

@@ -49,7 +49,7 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${SERVICE_KEY}`
         }
       }),
-      fetch(`${Ge}/rest/v1/appointments?select=patient_email,patient_name`, {
+      fetch(`${Ge}/rest/v1/appointments?select=id,patient_email,patient_name,service_title,service_icon,service_dur,rdv_date,slot,status,reminder_sent`, {
         headers: {
           apikey: SERVICE_KEY,
           Authorization: `Bearer ${SERVICE_KEY}`
@@ -65,6 +65,90 @@ export default async function handler(req, res) {
 
     const profiles = await profilesRes.json();
     const appointments = await appointmentsRes.json();
+
+    // 2b. Daily 48h appointment reminder check (runs automatically every day via Vercel Cron)
+    const nowMs = Date.now();
+    let reminders48hSent = 0;
+    const due48h = (Array.isArray(appointments) ? appointments : []).filter(a => {
+      if (!a || a.status !== "confirmed" || a.reminder_sent) return false;
+      if (!a.rdv_date || !a.slot || !a.patient_email || !a.patient_email.includes("@")) return false;
+      const [h, m] = String(a.slot).split(":").map(Number);
+      const d = new Date(a.rdv_date + "T12:00:00Z");
+      d.setUTCHours((h || 12) - 1, m || 0, 0, 0);
+      const diffHours = (d.getTime() - nowMs) / 3600000;
+      return diffHours > 0 && diffHours <= 52;
+    });
+
+    for (const rdv of due48h) {
+      try {
+        const formattedDate = new Date(rdv.rdv_date + "T12:00:00").toLocaleDateString("fr-FR", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric"
+        });
+        const reminderHtml = `<div style="font-family:sans-serif;padding:24px;max-width:520px;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #E3F2FD;color:#37474F;line-height:1.6">
+          <div style="background:linear-gradient(135deg,#003891,#1565C0);padding:20px;border-radius:12px;text-align:center;color:#fff;margin-bottom:20px">
+            <div style="font-size:26px">⏰</div>
+            <h2 style="margin:6px 0 0;font-size:18px">Rappel de votre séance VITASCIENZELAB</h2>
+          </div>
+          <p>Bonjour <strong>${rdv.patient_name || ""}</strong>,</p>
+          <p>Nous vous rappelons votre séance prévue dans moins de 48h :</p>
+          <div style="background:#F0F4FF;border-radius:12px;padding:16px;margin:16px 0">
+            <div><strong>Prestation :</strong> ${rdv.service_icon || "🌿"} ${rdv.service_title || "Séance bien-être"}</div>
+            <div><strong>Date :</strong> ${formattedDate}</div>
+            <div><strong>Horaire :</strong> ${rdv.slot}</div>
+            <div><strong>Lieu :</strong> 9 Rue du Champ Pile, 10320 Bouilly (Aube)</div>
+          </div>
+          <p style="font-size:12px;color:#546E7A">En cas d'empêchement, vous pouvez modifier votre rendez-vous depuis votre espace personnel sur <a href="https://vitascienzelab.vercel.app">vitascienzelab.vercel.app</a> ou par SMS au 06 72 66 68 09.</p>
+          <p style="font-size:11px;color:#90A4AE;margin-top:20px">VITASCIENZELAB – Herboristerie Champenoise · SIRET : 841 057 730 00019</p>
+        </div>`;
+
+        const mailRes = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "api-key": BREVO_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            sender: {
+              name: "VITASCIENZELAB – Herboristerie Champenoise",
+              email: "herboristeriechampenoise@gmail.com"
+            },
+            to: [{ email: rdv.patient_email.trim() }],
+            subject: "⏰ Rappel — Votre séance VITASCIENZELAB approche",
+            htmlContent: reminderHtml
+          })
+        });
+
+        if (mailRes.ok) {
+          reminders48hSent++;
+          await fetch(`${Ge}/rest/v1/appointments?id=eq.${encodeURIComponent(rdv.id)}`, {
+            method: "PATCH",
+            headers: {
+              apikey: SERVICE_KEY,
+              Authorization: `Bearer ${SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal"
+            },
+            body: JSON.stringify({ reminder_sent: true })
+          });
+        }
+      } catch (remErr) {
+        console.error("48h reminder error for", rdv.id, remErr);
+      }
+    }
+
+    // If triggered by daily Vercel Cron (GET) on any day other than the 1st of the month, return after 48h reminders
+    const isManualPost = req.method === "POST";
+    const isFirstOfMonth = new Date().getUTCDate() === 1;
+    if (!isManualPost && !isFirstOfMonth) {
+      return res.status(200).json({
+        success: true,
+        mode: "daily_48h_check",
+        reminders48hSent
+      });
+    }
 
     // 3. Compile list of unique clients by email
     const clientsMap = {};

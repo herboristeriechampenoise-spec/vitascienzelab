@@ -2,6 +2,8 @@
 // Server-side endpoint for admin reads/writes and Supabase Storage signed URLs requiring service role key (bypasses RLS)
 // The service key stays server-side — never exposed in the browser bundle
 
+import crypto from 'crypto';
+
 let bucketInitialized = false;
 
 async function ensureStorageBucket(SUPABASE_URL, SERVICE_KEY, bucketName = 'client-documents') {
@@ -48,6 +50,11 @@ async function ensureStorageBucket(SUPABASE_URL, SERVICE_KEY, bucketName = 'clie
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const origin = String(req.headers.origin || req.headers.referer || '');
+  if (origin && !origin.includes('vitascienzelab') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+    return res.status(403).json({ error: 'Forbidden origin' });
   }
 
   const SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE;
@@ -138,17 +145,11 @@ export default async function handler(req, res) {
         }
       }
 
-      let updatedFiles;
-      if (replaceByName) {
-        updatedFiles = [...currentFiles];
-        for (const nf of newFiles) {
-          const idx = updatedFiles.findIndex(f => f && f.name === nf.name);
-          if (idx !== -1) updatedFiles[idx] = nf;
-          else updatedFiles.push(nf);
-        }
-      } else {
-        updatedFiles = [...currentFiles, ...newFiles];
-      }
+      const newNamesLower = new Set(newFiles.map(nf => String(nf?.name || '').trim().toLowerCase()).filter(Boolean));
+      const updatedFiles = [
+        ...currentFiles.filter(f => f && !newNamesLower.has(String(f.name || '').trim().toLowerCase())),
+        ...newFiles
+      ];
 
       const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(patientId)}`, {
         method: 'PATCH',
@@ -160,20 +161,6 @@ export default async function handler(req, res) {
         const errText = await patchRes.text();
         console.error('append_client_files patch failed:', errText);
         return res.status(patchRes.status).json({ error: errText });
-      }
-
-      if (notePrefix && newFiles.length > 0) {
-        await Promise.all(newFiles.map(fileObj =>
-          fetch(`${SUPABASE_URL}/rest/v1/admin_notes`, {
-            method: 'POST',
-            headers: svcHeaders,
-            body: JSON.stringify({
-              patient_id: patientId,
-              note: `${notePrefix}${JSON.stringify(fileObj)}`,
-              created_at: new Date().toISOString()
-            })
-          }).catch(() => {})
-        ));
       }
 
       return res.status(200).json({ ok: true, client_files: updatedFiles });
@@ -411,8 +398,9 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!table) {
-      return res.status(400).json({ error: 'Missing required field: table' });
+    const ALLOWED_TABLES = ['appointments', 'profiles', 'admin_notes', 'questionnaires', 'blocked_slots'];
+    if (!table || !ALLOWED_TABLES.includes(table)) {
+      return res.status(400).json({ error: 'Invalid or missing table' });
     }
 
     if (operation === 'get') {
@@ -434,10 +422,73 @@ export default async function handler(req, res) {
     }
 
     if (operation === 'post') {
+      const payloadData = { ...(data || {}) };
+      const checkConflict = payloadData._check_conflict === true;
+      delete payloadData._check_conflict;
+
+      if (table === 'appointments') {
+        // 1. Atomic slot availability check when requested by online booking
+        if (checkConflict && payloadData.rdv_date && payloadData.slot) {
+          const [existingApptsRes, blockedRes] = await Promise.all([
+            fetch(`${SUPABASE_URL}/rest/v1/appointments?rdv_date=eq.${encodeURIComponent(payloadData.rdv_date)}&slot=eq.${encodeURIComponent(payloadData.slot)}&status=eq.confirmed&select=id`, {
+              headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
+            }),
+            fetch(`${SUPABASE_URL}/rest/v1/blocked_slots?blocked_date=eq.${encodeURIComponent(payloadData.rdv_date)}&select=id,slot`, {
+              headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
+            })
+          ]);
+          const existingAppts = existingApptsRes.ok ? await existingApptsRes.json() : [];
+          const blockedSlots = blockedRes.ok ? await blockedRes.json() : [];
+          const isSlotBlocked = Array.isArray(blockedSlots) && blockedSlots.some(b => !b.slot || b.slot === '' || b.slot === payloadData.slot);
+          if ((Array.isArray(existingAppts) && existingAppts.length > 0) || isSlotBlocked) {
+            return res.status(409).json({ error: 'Ce créneau vient d\'être réservé ou rendu indisponible. Veuillez choisir un autre horaire.' });
+          }
+        }
+
+        // 2. Automatic profile linking / creation for every new appointment with a valid email
+        const cleanEmail = String(payloadData.patient_email || '').trim().toLowerCase();
+        if (cleanEmail && cleanEmail.includes('@') && cleanEmail !== '—') {
+          payloadData.patient_email = cleanEmail;
+          if (!payloadData.patient_id || String(payloadData.patient_id).includes('@')) {
+            try {
+              const profRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?email=ilike.${encodeURIComponent(cleanEmail)}&select=id`, {
+                headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
+              });
+              const profRows = profRes.ok ? await profRes.json() : [];
+              if (Array.isArray(profRows) && profRows[0]?.id) {
+                payloadData.patient_id = profRows[0].id;
+              } else {
+                const newProfId = crypto.randomUUID();
+                const nameParts = String(payloadData.patient_name || '').trim().split(/\s+/);
+                const prenom = nameParts[0] || '';
+                const nom = nameParts.slice(1).join(' ') || '';
+                const createProfRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+                  method: 'POST',
+                  headers: { ...svcHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
+                  body: JSON.stringify({
+                    id: newProfId,
+                    email: cleanEmail,
+                    prenom,
+                    nom,
+                    tel: payloadData.patient_tel && payloadData.patient_tel !== '—' ? payloadData.patient_tel : '',
+                    created_at: new Date().toISOString()
+                  })
+                });
+                if (createProfRes.ok) {
+                  payloadData.patient_id = newProfId;
+                }
+              }
+            } catch (linkErr) {
+              console.error('Auto-link profile warning:', linkErr);
+            }
+          }
+        }
+      }
+
       const r = await fetch(SUPABASE_URL + '/rest/v1/' + table, {
         method: 'POST',
         headers: { ...svcHeaders, Prefer: 'return=representation' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payloadData)
       });
       if (!r.ok) {
         const errText = await r.text();
@@ -450,10 +501,31 @@ export default async function handler(req, res) {
 
     if (operation === 'patch') {
       if (!id) return res.status(400).json({ error: 'Missing id for patch' });
+      const payloadData = { ...(data || {}) };
+      const checkConflict = payloadData._check_conflict === true;
+      delete payloadData._check_conflict;
+
+      if (table === 'appointments' && checkConflict && payloadData.rdv_date && payloadData.slot) {
+        const [existingApptsRes, blockedRes] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/appointments?rdv_date=eq.${encodeURIComponent(payloadData.rdv_date)}&slot=eq.${encodeURIComponent(payloadData.slot)}&status=eq.confirmed&id=neq.${encodeURIComponent(id)}&select=id`, {
+            headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
+          }),
+          fetch(`${SUPABASE_URL}/rest/v1/blocked_slots?blocked_date=eq.${encodeURIComponent(payloadData.rdv_date)}&select=id,slot`, {
+            headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
+          })
+        ]);
+        const existingAppts = existingApptsRes.ok ? await existingApptsRes.json() : [];
+        const blockedSlots = blockedRes.ok ? await blockedRes.json() : [];
+        const isSlotBlocked = Array.isArray(blockedSlots) && blockedSlots.some(b => !b.slot || b.slot === '' || b.slot === payloadData.slot);
+        if ((Array.isArray(existingAppts) && existingAppts.length > 0) || isSlotBlocked) {
+          return res.status(409).json({ error: 'Ce créneau est déjà occupé ou indisponible. Veuillez choisir un autre horaire.' });
+        }
+      }
+
       const r = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + encodeURIComponent(id), {
         method: 'PATCH',
         headers: svcHeaders,
-        body: JSON.stringify(data)
+        body: JSON.stringify(payloadData)
       });
       if (!r.ok) {
         const errText = await r.text();
