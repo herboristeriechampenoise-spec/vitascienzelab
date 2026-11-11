@@ -9442,8 +9442,9 @@ function _g({
   blocked: n = []
 }) {
   let l = new Date(),
-    [a, i] = useState(l.getFullYear()),
-    [u, s] = useState(l.getMonth()),
+    initD = e && /^\d{4}-\d{2}-\d{2}$/.test(e) ? new Date(e + "T12:00:00") : l,
+    [a, i] = useState(initD.getFullYear()),
+    [u, s] = useState(initD.getMonth()),
     r = new Date(a, u + 1, 0).getDate(),
     v = new Date(a, u, 1).getDay() - 1;
   v < 0 && (v = 6);
@@ -9951,14 +9952,15 @@ function Dg({
       [d]: h.target.value
     })),
     f = async () => {
-      if (!a.email || !a.pw) {
+      let cleanEmail = (a.email || "").trim();
+      if (!cleanEmail || !a.pw) {
         p("Email et mot de passe requis");
         return;
       }
       k(!0), p("");
       try {
         if (ee) {
-          let d = ue.users.find(h => h.email === a.email && h.pw === a.pw);
+          let d = ue.users.find(h => h.email === cleanEmail && h.pw === a.pw);
           if (!d) {
             p("Email ou mot de passe incorrect"), k(!1);
             return;
@@ -9971,11 +9973,25 @@ function Dg({
             token: "demo_" + d.id
           });
         } else {
-          let d = await Ii.signIn(a.email, a.pw),
+          let d = await Ii.signIn(cleanEmail, a.pw),
             h = d.error?.message || d.msg || "",
             w = d.error_code || d.error?.status || "";
+          if (h.includes("confirmed") || String(w).includes("email_not_confirmed")) {
+            await fetch("/api/admin-write", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                operation: "register_or_update_client",
+                email: cleanEmail,
+                password: a.pw
+              })
+            }).catch(() => {});
+            d = await Ii.signIn(cleanEmail, a.pw);
+            h = d.error?.message || d.msg || "";
+            w = d.error_code || d.error?.status || "";
+          }
           if (h || w) {
-            h.includes("Invalid") || w.includes("invalid_credentials") ? p("Email ou mot de passe incorrect.") : h.includes("confirmed") || w.includes("email_not_confirmed") ? p("Confirmez votre email avant de vous connecter.") : p("Erreur : " + (h || w)), k(!1);
+            h.includes("Invalid") || String(w).includes("invalid_credentials") ? p("Email ou mot de passe incorrect. Si vous avez oublié votre mot de passe ou n'en avez pas encore, cliquez sur « Mot de passe oublié / Créer un accès » ci-dessous.") : p("Erreur : " + (h || w)), k(!1);
             return;
           }
           let B = d.session?.access_token || d.access_token,
@@ -10010,28 +10026,42 @@ function Dg({
       k(!1);
     },
     m = async () => {
-      if (!a.prenom || !a.nom || !a.email || !a.pw) {
+      let cleanEmail = (a.email || "").trim();
+      if (n === "register" && (!a.prenom || !a.nom || !cleanEmail || !a.pw)) {
         p("Tous les champs marqu\xE9s * sont requis");
+        return;
+      }
+      if (n === "reset" && (!cleanEmail || !a.pw)) {
+        p("Veuillez renseigner votre email et votre nouveau mot de passe");
         return;
       }
       if (a.pw.length < 6) {
         p("Mot de passe : 6 caract\xE8res minimum");
         return;
       }
-      if (!a.email.match(/^[^@]+@[^@]+\.[^@]+$/)) {
+      if (!cleanEmail.match(/^[^@]+@[^@]+\.[^@]+$/)) {
         p("Adresse email invalide");
         return;
       }
       k(!0), p("");
       try {
         if (ee) {
-          if (ue.users.find(h => h.email === a.email)) {
-            p("Email d\xE9j\xE0 utilis\xE9"), k(!1);
+          let existingDemo = ue.users.find(h => h.email === cleanEmail);
+          if (existingDemo) {
+            existingDemo.pw = a.pw;
+            e({
+              id: existingDemo.id,
+              email: existingDemo.email,
+              prenom: existingDemo.prenom,
+              nom: existingDemo.nom,
+              token: "demo_" + existingDemo.id
+            });
+            k(!1);
             return;
           }
           let d = {
             id: Ln(),
-            email: a.email,
+            email: cleanEmail,
             pw: a.pw,
             prenom: a.prenom,
             nom: a.nom,
@@ -10046,33 +10076,54 @@ function Dg({
             token: "demo_" + d.id
           });
         } else {
-          let d = S && r && u ? `${S}-${r}-${u}` : null,
-            h = await Ii.signUp(a.email, a.pw, {
-              prenom: a.prenom,
-              nom: a.nom,
-              tel: a.tel,
-              dob: d
-            }),
-            w = h.error?.message || h.msg || "",
-            B = h.error_code || "";
-          if (w || B) {
-            w.includes("already registered") || B.includes("user_already_exists") ? p("Cet email est d\xE9j\xE0 utilis\xE9. Connectez-vous.") : w.includes("password") || B.includes("weak_password") ? p("Mot de passe trop simple. Minimum 6 caract\xE8res.") : p("Erreur : " + (w || B)), k(!1);
+          let d = S && r && u ? `${S}-${r}-${u}` : null;
+          let regRes = await fetch("/api/admin-write", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operation: "register_or_update_client",
+              email: cleanEmail,
+              password: a.pw,
+              meta: {
+                prenom: a.prenom ? a.prenom.trim() : "",
+                nom: a.nom ? a.nom.trim() : "",
+                tel: a.tel ? a.tel.trim() : "",
+                dob: d
+              }
+            })
+          }).then(res => res.json()).catch(() => null);
+
+          if (!regRes || regRes.error) {
+            p("Erreur : " + (regRes?.error || "Impossible d'enregistrer le compte."));
+            k(!1);
             return;
           }
-          let M = h.session || h,
-            Y = h.user || M?.user,
-            O = h.session?.access_token || h.access_token || M?.access_token;
-          if (!O) {
-            l("confirm"), k(!1);
+
+          let signRes = await Ii.signIn(cleanEmail, a.pw),
+            O = signRes.session?.access_token || signRes.access_token,
+            Y = signRes.user || signRes.session?.user;
+          if (!O || !Y) {
+            p("Compte activé ! Vous pouvez maintenant vous connecter.");
+            l("login"), k(!1);
             return;
           }
-          let L = Y?.user_metadata || {};
+          let L = Y?.user_metadata || {},
+            files = [],
+            guests = [];
+          try {
+            let de = await adminGet("profiles", `id=eq.${Y.id}&select=client_files,guests`);
+            Array.isArray(de) && de[0] && (files = de[0].client_files || [], guests = de[0].guests || []);
+          } catch {}
+          activeSessionToken = O;
           e({
             id: Y.id,
             email: Y.email,
-            prenom: L.prenom || a.prenom,
-            nom: L.nom || a.nom,
-            token: O
+            prenom: L.prenom || regRes.prenom || a.prenom || "",
+            nom: L.nom || regRes.nom || a.nom || "",
+            tel: L.tel || regRes.tel || a.tel || "",
+            token: O,
+            client_files: files,
+            guests
           });
         }
       } catch {
@@ -10290,7 +10341,7 @@ function Dg({
               children: "Ann\xE9e"
             }), Array.from({
               length: 96
-            }, (d, h) => 2025 - h).map(d => _jsx("option", {
+            }, (d, h) => new Date().getFullYear() - h).map(d => _jsx("option", {
               value: String(d),
               children: d
             }, d))]
@@ -10303,6 +10354,17 @@ function Dg({
           onChange: Q("tel"),
           placeholder: "06 12 34 56 78"
         })
+      }), n === "reset" && _jsx("div", {
+        style: {
+          background: "#E8F0FE",
+          borderRadius: 10,
+          padding: "10px 14px",
+          marginBottom: 14,
+          fontSize: 12,
+          color: "#1565C0",
+          lineHeight: 1.5
+        },
+        children: "\u{1F511} Entrez l'adresse email de votre rendez-vous et choisissez un nouveau mot de passe (6 caract\xE8res min.) pour acc\xE9der imm\xE9diatement \xE0 votre espace personnel."
       }), _jsx(Ie, {
         label: "Email *",
         children: _jsx(ut, {
@@ -10312,7 +10374,7 @@ function Dg({
           placeholder: "marie@email.com"
         })
       }), _jsx(Ie, {
-        label: n === "register" ? "Mot de passe * (6 car. min.)" : "Mot de passe *",
+        label: n === "reset" ? "Nouveau mot de passe * (6 car. min.)" : n === "register" ? "Mot de passe * (6 car. min.)" : "Mot de passe *",
         children: _jsx(ut, {
           type: "password",
           value: a.pw,
@@ -10334,27 +10396,27 @@ function Dg({
           width: "100%",
           marginBottom: 10
         },
-        children: R ? "Chargement\u2026" : n === "login" ? "\u2192 Se connecter" : "\u2192 Cr\xE9er mon compte"
+        children: R ? "Chargement\u2026" : n === "login" ? "\u2192 Se connecter" : n === "reset" ? "\u2713 Valider mon nouveau mot de passe" : "\u2192 Cr\xE9er mon compte"
       }), n === "login" && _jsx("button", {
-        onClick: async () => {
-          if (!a.email) {
-            p("Entrez votre email d'abord");
-            return;
-          }
-          if (ee) {
-            p("Fonction disponible en production uniquement");
-            return;
-          }
-          (await fetch(`${Ge}/auth/v1/recover`, {
-            method: "POST",
-            headers: {
-              apikey: j,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              email: a.email
-            })
-          })).ok ? p("\u2705 Email de r\xE9initialisation envoy\xE9 !") : p("Erreur lors de l'envoi.");
+        onClick: () => {
+          l("reset"), p("");
+        },
+        style: {
+          background: "none",
+          border: "none",
+          color: "#1565C0",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          textDecoration: "underline",
+          width: "100%",
+          marginBottom: 8,
+          padding: "4px 0"
+        },
+        children: "Mot de passe oubli\xE9 ou premier acc\xE8s ?"
+      }), n === "reset" && _jsx("button", {
+        onClick: () => {
+          l("login"), p("");
         },
         style: {
           background: "none",
@@ -10367,7 +10429,7 @@ function Dg({
           marginBottom: 8,
           padding: "4px 0"
         },
-        children: "Mot de passe oubli\xE9 ?"
+        children: "\u2190 Retour \xE0 la connexion"
       }), _jsx(ot, {
         onClick: t,
         style: {
@@ -10450,16 +10512,30 @@ function Tg({
   // adminFiles = everything NOT explicitly uploaded by a client (includes legacy files without uploaded_by)
   let adminFiles = combinedFiles.filter(C => C.uploaded_by !== "client");
   let clientFiles = combinedFiles.filter(C => C.uploaded_by === "client");
+  let [busyAppts, setBusyAppts] = useState([]),
+    [busyBlocked, setBusyBlocked] = useState([]),
+    [modSaving, setModSaving] = useState(!1),
+    [modError, setModError] = useState("");
   useEffect(() => {
     (async () => {
       s(!0);
       let C = [];
       try {
-        if (ee) C = ue.appointments.filter(W => W.patient_id === e.id || W.patient_email === e.email);else {
-          let [W, le] = await Promise.all([adminGet("appointments", `patient_id=eq.${e.id}&status=neq.archived&order=rdv_date.desc`), adminGet("appointments", `patient_email=eq.${encodeURIComponent(e.email)}&status=neq.archived&order=rdv_date.desc`)]),
+        let cleanEmail = (e.email || "").trim();
+        if (ee) {
+          C = ue.appointments.filter(W => W.patient_id === e.id || (W.patient_email || "").toLowerCase() === cleanEmail.toLowerCase());
+          setBusyAppts(ue.appointments);
+        } else {
+          let [W, le, busyRes] = await Promise.all([
+              adminGet("appointments", `patient_id=eq.${e.id}&status=neq.archived&order=rdv_date.desc`),
+              cleanEmail ? adminGet("appointments", `patient_email=ilike.${encodeURIComponent(cleanEmail)}&status=neq.archived&order=rdv_date.desc`) : Promise.resolve([]),
+              fetch("/api/get-busy-slots").then(res => res.json()).catch(() => ({}))
+            ]),
             Ne = [...(Array.isArray(W) ? W : []), ...(Array.isArray(le) ? le : [])],
             De = new Set();
           C = Ne.filter(st => De.has(st.id) ? !1 : (De.add(st.id), !0)), C.sort((st, ke) => (ke.rdv_date || "").localeCompare(st.rdv_date || ""));
+          if (Array.isArray(busyRes?.appointments)) setBusyAppts(busyRes.appointments);
+          if (Array.isArray(busyRes?.blockedSlots)) setBusyBlocked(busyRes.blockedSlots);
         }
       } catch (W) {
         console.error("Patient RDV load error:", W);
@@ -10542,26 +10618,52 @@ function Tg({
     [Oe, Ce] = useState(null),
     yl = useRef(null),
     qt = async () => {
-      if (!Y || !L) return;
-      let C = {
-        rdv_date: Y,
-        slot: L,
-        docs: B.docs || [],
-        docs_data: B.docs_data || []
-      };
-      if (ee) {
-        let le = ue.appointments.find(Ne => Ne.id === B.id);
-        le && Object.assign(le, C);
-      } else await adminPatch("appointments", B.id, C);
-      i(le => le.map(Ne => Ne.id === B.id ? {
-        ...Ne,
-        ...C
-      } : Ne));
-      let W = {
-        ...B,
-        ...C
-      };
-      await jn(e.email, "\u{1F4C5} S\xE9ance modifi\xE9e \u2014 VITASCIENZELAB", Ji(W, "confirm")), M(null), O(""), de("");
+      if (!Y || !L || !B) return;
+      setModSaving(!0), setModError("");
+      let oldDate = B.rdv_date,
+        oldSlot = B.slot,
+        C = {
+          rdv_date: Y,
+          slot: L,
+          ...(e?.id && !String(e.id).includes("@") ? { patient_id: e.id } : {})
+        };
+      try {
+        if (ee) {
+          let le = ue.appointments.find(Ne => Ne.id === B.id);
+          le && Object.assign(le, C);
+        } else {
+          let patchRes = await adminPatch("appointments", B.id, C);
+          if (!patchRes || patchRes.error) {
+            setModError("Erreur lors de la modification : " + (patchRes?.error || "Veuillez r\xE9essayer."));
+            setModSaving(!1);
+            return;
+          }
+          adminPost("admin_notes", {
+            patient_id: e?.id || B.patient_id || "unknown",
+            note: `\u{1F4F1} MODIFICATION CLIENT \u2014 ${e?.prenom || ""} ${e?.nom || ""} (${e?.email || B.patient_email}) a modifi\xE9 sa s\xE9ance du ${Ke(oldDate)} (${oldSlot}) au ${Ke(Y)} \xE0 ${L} (${B.service_title}).`,
+            created_at: new Date().toISOString()
+          }).catch(() => {});
+        }
+        i(le => le.map(Ne => Ne.id === B.id ? {
+          ...Ne,
+          ...C
+        } : Ne));
+        setBusyAppts(prev => prev.map(Ne => Ne.id === B.id ? {
+          ...Ne,
+          ...C
+        } : Ne));
+        let W = {
+          ...B,
+          ...C
+        };
+        jn(e.email || B.patient_email, "\u{1F4C5} S\xE9ance modifi\xE9e \u2014 VITASCIENZELAB", Ji(W, "confirm")).catch(() => {});
+        setModSaving(!1), M(null), O(""), de("");
+        alert(`\u2705 Votre rendez-vous a bien \xE9t\xE9 modifi\xE9 au ${vt(Y)} \xE0 ${L} !`);
+      } catch (err) {
+        console.error("Error modifying RDV:", err);
+        setModError("Erreur r\xE9seau. Veuillez r\xE9essayer.");
+        setModSaving(!1);
+      }
     },
     Wt = a.filter(C => !at(C) && C.status === "confirmed"),
     It = a.filter(C => at(C) || C.status === "completed" || C.status === "cancelled"),
@@ -10747,15 +10849,18 @@ function Tg({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 16
+        padding: 16,
+        overflowY: "auto"
       },
       children: _jsxs("div", {
         style: {
           background: "#fff",
           borderRadius: 20,
-          padding: 32,
-          maxWidth: 420,
+          padding: "24px 20px",
+          maxWidth: 480,
           width: "100%",
+          maxHeight: "92vh",
+          overflowY: "auto",
           boxShadow: "0 8px 40px rgba(0,0,0,.15)"
         },
         children: [_jsx("h3", {
@@ -10763,16 +10868,16 @@ function Tg({
             fontFamily: "'Playfair Display',serif",
             fontSize: 18,
             color: z,
-            marginBottom: 6
+            marginBottom: 4
           },
           children: "Modifier votre s\xE9ance"
         }), _jsxs("p", {
           style: {
             fontSize: 12,
             color: "#78909C",
-            marginBottom: 20
+            marginBottom: 14
           },
-          children: [B.service_icon, " ", B.service_title]
+          children: [B.service_icon, " ", B.service_title, " \xB7 Actuellement le ", Ke(B.rdv_date), " \xE0 ", B.slot]
         }), _jsxs("div", {
           style: {
             marginBottom: 14
@@ -10783,77 +10888,103 @@ function Tg({
               fontSize: 12,
               fontWeight: 600,
               color: z,
-              marginBottom: 6
+              marginBottom: 8
             },
-            children: "Nouvelle date"
-          }), _jsx("input", {
-            type: "date",
-            value: Y,
-            onChange: C => O(C.target.value),
-            min: new Date().toISOString().split("T")[0],
-            style: {
-              width: "100%",
-              border: `2px solid ${V}`,
-              borderRadius: 10,
-              padding: "10px 12px",
-              fontSize: 13,
-              color: z,
-              outline: "none"
-            }
+            children: "1. Choisissez une nouvelle date"
+          }), _jsx(_g, {
+            selected: Y,
+            onSelect: C => {
+              O(C), setModError("");
+            },
+            blocked: busyBlocked
           })]
-        }), _jsxs("div", {
+        }), Y && _jsxs("div", {
           style: {
-            marginBottom: 20
+            marginBottom: 18
           },
-          children: [_jsx("label", {
+          children: [_jsxs("label", {
             style: {
               display: "block",
               fontSize: 12,
               fontWeight: 600,
               color: z,
-              marginBottom: 6
+              marginBottom: 8
             },
-            children: "Nouveau cr\xE9neau"
+            children: ["2. Choisissez un cr\xE9neau pour le ", vt(Y)]
           }), _jsx("div", {
             style: {
               display: "grid",
               gridTemplateColumns: "repeat(3,1fr)",
               gap: 8
             },
-            children: Je.map(C => _jsx("button", {
-              onClick: () => de(C),
-              style: {
-                padding: "10px 6px",
-                borderRadius: 9,
-                border: `2px solid ${L === C ? q : V}`,
-                background: L === C ? q : "#fff",
-                color: L === C ? "#fff" : z,
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer"
-              },
-              children: C
-            }, C))
+            children: Je.map(C => {
+              let [sh, sm] = C.split(":").map(Number),
+                sMin = sh * 60 + sm,
+                eMin = sMin + (yn[B.service_id] || 45),
+                isBooked = busyAppts.filter(x => x.id !== B.id && x.rdv_date === Y && x.status === "confirmed").some(x => {
+                  if (!x.slot || !x.slot.includes(":")) return !1;
+                  let [bh, bm] = x.slot.split(":").map(Number),
+                    bStart = bh * 60 + bm,
+                    bEnd = bStart + (yn[x.service_id] || 45);
+                  return sMin < bEnd && eMin > bStart;
+                }),
+                isBlocked = busyBlocked.some(x => x.blocked_date === Y && (!x.slot || x.slot === "" || x.slot === C)),
+                unavail = isBooked || isBlocked;
+              return _jsxs("button", {
+                disabled: unavail,
+                onClick: () => {
+                  if (!unavail) {
+                    de(C), setModError("");
+                  }
+                },
+                style: {
+                  padding: "10px 6px",
+                  borderRadius: 9,
+                  border: `2px solid ${unavail ? "#F0F0F0" : L === C ? q : V}`,
+                  background: unavail ? "#FAFAFA" : L === C ? q : "#fff",
+                  color: unavail ? "#CFD8DC" : L === C ? "#fff" : z,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: unavail ? "not-allowed" : "pointer"
+                },
+                children: [C, unavail && _jsx("div", {
+                  style: {
+                    fontSize: 9
+                  },
+                  children: isBlocked ? "\u{1F512}" : "Indispo."
+                })]
+              }, C);
+            })
           })]
+        }), modError && _jsx("p", {
+          style: {
+            color: "#E53935",
+            fontSize: 12,
+            textAlign: "center",
+            marginBottom: 12
+          },
+          children: modError
         }), _jsxs("div", {
           style: {
             display: "flex",
             gap: 10
           },
           children: [_jsx(ot, {
-            onClick: () => M(null),
+            onClick: () => {
+              M(null), setModError("");
+            },
             style: {
               flex: 1
             },
             children: "Annuler"
           }), _jsx(ze, {
             onClick: qt,
-            disabled: !Y || !L,
+            disabled: !Y || !L || modSaving,
             style: {
               flex: 2,
-              opacity: Y && L ? 1 : 0.4
+              opacity: Y && L && !modSaving ? 1 : 0.4
             },
-            children: "\u2713 Confirmer"
+            children: modSaving ? "Enregistrement\u2026" : "\u2713 Confirmer la modification"
           })]
         })]
       })
@@ -12050,17 +12181,26 @@ function Bg({
                 }
                 le("");
                 try {
-                  let x = await Ii.signUp(Ce.patient_email, It, {
-                    prenom: (Ce.patient_name || "").split(" ")[0] || "",
-                    nom: (Ce.patient_name || "").split(" ").slice(1).join(" ") || "",
-                    tel: Ce.patient_tel || ""
-                  });
-                  if (x.error || x.msg) {
-                    le(x.error?.message || x.msg || "Erreur");
+                  let regRes = await fetch("/api/admin-write", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      operation: "register_or_update_client",
+                      email: (Ce.patient_email || "").trim(),
+                      password: It,
+                      meta: {
+                        prenom: (Ce.patient_name || "").split(" ")[0] || "",
+                        nom: (Ce.patient_name || "").split(" ").slice(1).join(" ") || "",
+                        tel: Ce.patient_tel || ""
+                      }
+                    })
+                  }).then(res => res.json()).catch(() => null);
+                  if (!regRes || regRes.error) {
+                    le(regRes?.error || "Erreur lors de la cr\xE9ation du compte");
                     return;
                   }
-                  x.user?.id && (await adminPatch("appointments", Ce.id, {
-                    patient_id: x.user.id
+                  regRes.userId && (await adminPatch("appointments", Ce.id, {
+                    patient_id: regRes.userId
                   }).catch(() => {})), Wt("done");
                 } catch {
                   le("Erreur r\xE9seau");

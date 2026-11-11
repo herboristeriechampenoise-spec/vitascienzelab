@@ -289,6 +289,128 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // 5. Register or update client auth account (seamless signup / password reset & appointment linking)
+    if (operation === 'register_or_update_client') {
+      const cleanEmail = String(body.email || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      const meta = body.meta || {};
+      if (!cleanEmail || password.length < 6) {
+        return res.status(400).json({ error: 'Email valide et mot de passe (6 caractères min.) requis.' });
+      }
+
+      const authHeaders = {
+        apikey: SERVICE_KEY,
+        Authorization: 'Bearer ' + SERVICE_KEY,
+        'Content-Type': 'application/json'
+      };
+
+      // Check if user already exists in Supabase Auth
+      const listRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: authHeaders });
+      const listData = listRes.ok ? await listRes.json() : { users: [] };
+      const existingUser = (listData.users || []).find(u => String(u.email || '').trim().toLowerCase() === cleanEmail);
+
+      // Also check existing profile by email
+      const profCheckRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?email=ilike.${encodeURIComponent(cleanEmail)}&select=id,email,prenom,nom,tel,dob`, {
+        headers: authHeaders
+      });
+      const existingProfs = profCheckRes.ok ? await profCheckRes.json() : [];
+      const existingProf = Array.isArray(existingProfs) && existingProfs[0] ? existingProfs[0] : null;
+
+      const mergedMeta = {
+        ...(existingUser?.user_metadata || {}),
+        email: cleanEmail,
+        email_verified: true,
+        prenom: meta.prenom || existingUser?.user_metadata?.prenom || existingProf?.prenom || '',
+        nom: meta.nom || existingUser?.user_metadata?.nom || existingProf?.nom || '',
+        tel: meta.tel || existingUser?.user_metadata?.tel || existingProf?.tel || '',
+        ...(meta.dob || existingUser?.user_metadata?.dob || existingProf?.dob ? { dob: meta.dob || existingUser?.user_metadata?.dob || existingProf?.dob } : {})
+      };
+
+      let userId = existingUser?.id || null;
+
+      if (existingUser) {
+        const updRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${existingUser.id}`, {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify({
+            password,
+            email_confirm: true,
+            user_metadata: mergedMeta
+          })
+        });
+        if (!updRes.ok) {
+          const errText = await updRes.text();
+          return res.status(updRes.status).json({ error: errText });
+        }
+      } else {
+        const createPayload = {
+          email: cleanEmail,
+          password,
+          email_confirm: true,
+          user_metadata: mergedMeta
+        };
+        if (existingProf?.id && !existingProf.id.includes('@')) {
+          createPayload.id = existingProf.id;
+        }
+        const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify(createPayload)
+        });
+        if (!createRes.ok) {
+          const errText = await createRes.text();
+          return res.status(createRes.status).json({ error: errText });
+        }
+        const createdUser = await createRes.json();
+        userId = createdUser.id;
+      }
+
+      if (userId) {
+        // Ensure profile exists and is linked
+        if (!existingProf) {
+          await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+            method: 'POST',
+            headers: { ...svcHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
+            body: JSON.stringify({
+              id: userId,
+              email: cleanEmail,
+              prenom: mergedMeta.prenom || '',
+              nom: mergedMeta.nom || '',
+              tel: mergedMeta.tel || '',
+              dob: mergedMeta.dob || null,
+              created_at: new Date().toISOString()
+            })
+          }).catch(() => {});
+        } else {
+          await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(existingProf.id)}`, {
+            method: 'PATCH',
+            headers: svcHeaders,
+            body: JSON.stringify({
+              prenom: mergedMeta.prenom || existingProf.prenom || '',
+              nom: mergedMeta.nom || existingProf.nom || '',
+              tel: mergedMeta.tel || existingProf.tel || ''
+            })
+          }).catch(() => {});
+        }
+
+        // Link all existing appointments with this email to this userId
+        await fetch(`${SUPABASE_URL}/rest/v1/appointments?patient_email=ilike.${encodeURIComponent(cleanEmail)}`, {
+          method: 'PATCH',
+          headers: svcHeaders,
+          body: JSON.stringify({ patient_id: userId })
+        }).catch(() => {});
+      }
+
+      return res.status(200).json({
+        ok: true,
+        userId,
+        email: cleanEmail,
+        prenom: mergedMeta.prenom || '',
+        nom: mergedMeta.nom || '',
+        tel: mergedMeta.tel || ''
+      });
+    }
+
     if (!table) {
       return res.status(400).json({ error: 'Missing required field: table' });
     }

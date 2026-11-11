@@ -103,10 +103,12 @@ export default async function handler(req, res) {
       };
     }
 
-    // 5. Check if questionnaire is already submitted
+    // 5. Check if questionnaire is already submitted for this specific appointment
     let alreadyDone = false;
     let queryCheck = 'appointment_id=eq.' + encodeURIComponent(id);
-    if (patientEmail) queryCheck += ',patient_email.eq.' + encodeURIComponent(patientEmail);
+    if (!id.startsWith('RDV') && patientEmail) {
+      queryCheck += ',patient_email.eq.' + encodeURIComponent(patientEmail);
+    }
     
     const questRes = await fetch(Ge + '/rest/v1/questionnaires?or=(' + queryCheck + ')&select=id', { headers });
     if (questRes.ok) {
